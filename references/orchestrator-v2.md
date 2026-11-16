@@ -14,6 +14,7 @@ Derived from T3 Code Beta's Orchestrator MCP tool schemas and orchestration inst
 | `task_cancel` | Stop a delegated task and the work it started. |
 | `t3_thread_read` | Read a child thread's messages, plans, or activity. |
 | `t3_thread_send` | Send a follow-up to a thread. Not a replacement for a new review delegate. |
+| `t3_thread_wait` | Block on a thread run when the current turn truly needs the result. |
 | `t3_thread_interrupt` | Interrupt a top-level thread. Not for delegated children. |
 | `request_secret` | Ask the user for one secret without placing it in a task brief. |
 | `t3_environment_links` | List linked machines for cross-environment delegation. |
@@ -212,9 +213,29 @@ Reading a child's final result marks it delivered. Mention the child by its `lin
 
 ### `t3_thread_send`
 
-Sends a message to any thread. `mode: "auto"` starts an idle thread, steers a running turn, or queues. `queue`, `steer`, and `restart` are explicit alternatives. A send to a finished child thread starts a fresh task and returns its `taskId`.
+Sends a message to any thread. `mode: "auto"` starts an idle thread, steers a running turn, or queues. `queue`, `steer`, and `restart` are explicit alternatives.
+
+Response fields:
+
+```json
+{
+  "threadId": "...",
+  "link": "...",
+  "messageId": "...",
+  "runId": "...",
+  "taskId": "...",
+  "status": "running",
+  "delivery": "started"
+}
+```
+
+A send to a finished child thread starts a fresh task in that same thread, returns its `taskId`, and gives it a completion wake. This is the intended mechanism for the `tiered-delivery` preset's fix loop: the parent sends only findings, the original child fixes them, and the parent reviews again.
 
 For a new review or re-check, use a fresh `delegate_task` instead. It keeps the review independent and gives you a new task to cancel if needed.
+
+### `t3_thread_wait`
+
+Waits for a thread's run to finish. Omit `runId` for the latest run. On timeout, with `next` end your turn; without it, call again. Prefer completion wakes for async delegates. Use this only when the current turn truly needs the result, such as a blocking follow-up run.
 
 ### `t3_thread_interrupt`
 

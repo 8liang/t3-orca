@@ -1,13 +1,15 @@
 ---
 name: t3-orca
-description: Orchestrate T3 Code sub-agents on Orchestrator V2 by discovering provider/model capabilities and delegating each task to a capability-matched target. Use for role-specialized or parallel delegation, cross-provider review, model routing, and worktree-isolated child tasks. Do not use when one agent can finish ordinary work without delegation.
+description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing. Includes a tiered-delivery preset for 逐项开发 with an interactive per-session Tier Profile window: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Use for parallel or cross-provider delegation and worktree-isolated child tasks. Do not use when one agent can finish ordinary work without delegation."
 metadata:
-  short-description: Capability-routed T3 sub-agent orchestration
+  short-description: Tiered T3 sub-agent delivery and parent review
 ---
 
 # T3 ORCA
 
 ORCA = Orchestrator Routing & Capability Assignment. Use T3 Code's Orchestrator V2 to split work across child agents and choose each child's `providerInstanceId` and `model` from live capabilities, not from brand memory.
+
+Short invocation: `$t3-orca 逐项开发 <request>` applies the tiered-delivery preset below.
 
 ## When to use
 
@@ -33,17 +35,65 @@ Do not delegate trivial work, tightly coupled edits, or tasks where coordination
 
 `delegate_task` creates an app-owned child: it has a `taskId`, appears as a T3 subagent, can be cancelled, and wakes the parent on completion.
 
+## Preset: tiered delivery
+
+When the user says `逐项开发`, `tiered delivery`, `按 ORCA 默认开发流程`, or gives a multi-item implementation request that also asks for autonomous review/commit handling (for example, `逐项提交`, `review 后 commit`, `不 push`), apply [references/tiered-delivery.md](references/tiered-delivery.md).
+
+Short form:
+
+- **UI/design** routes to `sol6.1`: provider `codex`, model `gpt-6.1-sol`, `reasoningEffort: high`.
+- **Pure code** routes to magpie DeepSeek-Flash (Claude): provider `magpie`, model `dumate/deepseek-v41-flash[1m]`, `effort: high`.
+- Defaults are `reasoningEffort: high` for UI and `effort: high` for code. A user override such as `use max` or `use fast` wins.
+- The **parent reviews every item by default**. Fix instructions go back to the original child thread; a re-check is a new review round.
+- Max **5 review rounds** per item. If substantive issues remain, do not commit.
+- Tests and review pass, then **commit only that item**; never push.
+- Independent items may run in parallel; review and commit are per item.
+- Resolve tiers from live capabilities. Do not ask the user to type provider, model, or effort when a tier is known.
+- If a tier target is unavailable, the preset authorizes a reported fallback; never substitute silently.
+
+### Tier profile window
+
+The short form above is the default profile. Tiers change between sessions, so resolve a profile before delegating:
+
+1. an inline `tiers:` block in the current message;
+2. the nearest `.t3-orca/tiers.yaml` from the working directory up to the git root;
+3. `~/.config/t3-orca/tiers.yaml`;
+4. otherwise open the Tier Profile window once.
+
+The window is [assets/tier-profile.html](assets/tier-profile.html). It is a self-contained, offline configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, optional live-capabilities validation, saved presets, and a generated `tiers:` block.
+
+Show it in T3 Code:
+
+- Call `html_preview` with the absolute path to `assets/tier-profile.html` and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and the returned `contentHeight` as `height` (cap 2000). Do not inline the HTML.
+- Say one line: edit the tiers in the window, then copy the generated YAML back (or save it to `.t3-orca/tiers.yaml`).
+- If those tools are unavailable, or the user says the frame is not interactive, give them the absolute file path to open in a browser.
+- When they return the YAML, validate every target against `orchestrator_capabilities`, restate it once in compact form, and use it for the thread. Do not ask again per item.
+
+Chat fallback when no window is available:
+
+```yaml
+tiers:
+  ui: sol6.1 @ high
+  code: deepseek-flash-claude @ high
+  fast: code @ low
+  review: parent
+```
+
+Say only changed lines are required; tiers can be added or removed. Then validate against capabilities and use it. See [references/tier-profile.md](references/tier-profile.md).
+
 ## Non-negotiable rules
 
 1. **Discover before routing.** Call `orchestrator_capabilities` once in the thread before the first `delegate_task`. Call it again only after an error or a user-named provider change. Never invent model IDs or option values.
 2. **Use `delegate_task` for capability routing.** Native subagent tools such as `Agent` or `spawn_agent` are for same-provider work with no settings beyond yours. Any cross-provider target, explicit model or options, worktree isolation, or app-owned child must use `delegate_task`.
 3. **The child starts with no parent history.** Every brief must be self-contained.
-4. **Do not poll.** Async completion wakes this thread; after starting async delegates, end the turn. No sleep loops, `task_status` polling, or watchers; do not use `t3_thread_wait` as a substitute for a delegate completion wake.
+4. **Do not poll.** Async completion wakes this thread; after starting async delegates or sending a fix follow-up, end the turn. No sleep loops, `task_status` polling, or watchers. Use `t3_thread_wait` only when the current turn truly needs the result.
 5. **Never silently substitute.** If a requested provider or model is unavailable, or `canRunChildTask` is false, report it. Choose an explicit alternative only when the user already authorized a fallback.
-6. **Each review or re-check is a new `delegate_task`.** Do not send new review work to an old child with `t3_thread_send`. Fix small findings yourself.
+6. **Default: each independent review or re-check is a new `delegate_task`.** Do not send new review work to an old child with `t3_thread_send`. Exception: the `tiered-delivery` preset can make the parent the reviewer and sends only fix instructions back to the original child thread. If its tier profile names a review target, use a fresh review delegate per round.
 7. **`role` only labels the brief.** It prefixes "Act as the ... sub-agent"; it does not grant tools, change permissions, or restrict behavior. Put actual responsibilities in the brief.
 8. **No secrets in `task`.** Use `request_secret`. Never put tokens, passwords, or private keys in a child brief.
 9. **A delegated child does not re-delegate.** If you are the child, do the work yourself. Start no subagents unless your brief explicitly authorizes it.
+10. **Apply the preset only when it fits.** Use `tiered-delivery` when the user invokes it by name or gives a multi-item implementation request that also asks for autonomous review/commit handling. Do not apply its parent-review and per-item-commit rules to ordinary one-off delegation.
+11. **Resolve the tier profile once per thread.** Check the inline `tiers:` block, the nearest `.t3-orca/tiers.yaml`, then `~/.config/t3-orca/tiers.yaml`. If none exists, open the Tier Profile window once (or use the chat fallback). Do not ask for tier settings per item, and do not assume another session's profile still applies.
 
 ## Core workflow
 
@@ -112,6 +162,8 @@ Integrate results yourself. Do not ask one child to merge another child's work u
 
 For review, start a fresh delegate with the findings and the patch or PR to inspect. Prefer a different provider or model family from the author for high-risk work. Use `task_cancel` to stop superseded work; never `t3_thread_interrupt` on a child thread. Report cancelled tasks.
 
+Exception: in the `tiered-delivery` preset, the parent reviews and fix instructions go back to the original child thread. Follow [references/tiered-delivery.md](references/tiered-delivery.md).
+
 ## Routing defaults
 
 | Work | Role | Capability to optimize | Default isolation | Mode |
@@ -126,6 +178,8 @@ For review, start a fresh delegate with the findings and the patch or PR to insp
 
 These are starting points, not model IDs. Use the discovered `models` and `options` to pick exact targets. See [references/routing.md](references/routing.md).
 
+In the `tiered-delivery` preset, the `review` row is the parent thread by default. A tier profile can name a review target, which switches to a fresh review delegate per round.
+
 ## Failure handling
 
 | Symptom | Action |
@@ -139,11 +193,14 @@ These are starting points, not model IDs. Use the discovered `models` and `optio
 | Orchestrator tools absent | Try the tool name once; T3 tools may load late. If it is still absent, report that Orchestrator V2 is unavailable. Do not fake delegation with shell commands, native agents, or a CLI. |
 | Provider or model unavailable | Report the exact target and the error. Do not fall back to native tools, workflows, or CLIs unless the user approves. |
 | Child asks a question or needs approval | Surface it, or answer in the child thread if authorized. Do not guess. |
+| Substantive findings remain after round 5 | Mark the item blocked; do not commit. Report the findings and continue only with explicit authorization. |
 
 ## References
 
 - [references/orchestrator-v2.md](references/orchestrator-v2.md) - tool contracts, fields, statuses, and exact semantics.
 - [references/routing.md](references/routing.md) - capability signals, candidate scoring, and worked routing examples.
+- [references/tiered-delivery.md](references/tiered-delivery.md) - tier aliases, parent-review loop, 5-round limit, and per-item commit rules.
+- [references/tier-profile.md](references/tier-profile.md) - per-session `tiers:` overrides, the HTML window, resolution order, and validation.
 - [references/patterns.md](references/patterns.md) - fan-out, pipeline, review loop, worktree, escalation, and brief templates.
 
 ## Anti-patterns
@@ -151,8 +208,13 @@ These are starting points, not model IDs. Use the discovered `models` and `optio
 - Hardcoding model IDs or option values from memory.
 - Delegating without a self-contained brief.
 - Starting async children and then polling or sleeping in the same turn.
-- Sending a new review to a finished child instead of a new `delegate_task`.
+- Sending a new *review* to a finished child instead of a new `delegate_task` (outside the `tiered-delivery` fix loop).
 - Using `create_threads` or `t3_thread_launch` as if they were subagents.
 - Running parallel writers in one shared checkout without disjoint ownership.
 - Using `worktree` for dependent work that needs the parent's uncommitted state.
 - Assuming `role` changes the model's tools or capabilities.
+- Asking the user for provider, model, or effort when the `tiered-delivery` tier is known.
+- Pasting a long provider/model/effort template instead of opening the Tier Profile window.
+- Asking for tier settings per item instead of once per thread.
+- Assuming the last session's tier profile without checking.
+- Committing an item before tests and review pass, or pushing without being asked.

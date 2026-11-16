@@ -94,6 +94,8 @@ Optimize for reasoning depth and independence.
 - Do not ask for a vague "review this"; ask what must be true for the change to be correct.
 - A re-check after fixes is a new `delegate_task`, not a message to the old reviewer.
 
+Exception: the `tiered-delivery` preset makes the parent the reviewer and sends fix instructions back to the original child thread. See [tiered-delivery.md](tiered-delivery.md) for that workflow.
+
 ### Test
 
 Optimize for shell and test-runner execution, speed, and low cost.

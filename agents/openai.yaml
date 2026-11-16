@@ -1,4 +1,4 @@
 interface:
   display_name: "T3 ORCA"
-  short_description: "Route sub-agents to capability-matched provider-models"
-  default_prompt: "Use $t3-orca to plan this work and delegate it to capability-matched sub-agents."
+  short_description: "Tiered T3 sub-agent delivery and parent review"
+  default_prompt: "用 $t3-orca 逐项开发这个任务。如果我没有提供 tiers，先打开一次 Tier Profile 窗口；然后由父线程 Review，发现问题回原 Thread 修复，每项通过后提交，不要 Push。"

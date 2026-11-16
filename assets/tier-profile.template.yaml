@@ -1,0 +1,14 @@
+# T3 ORCA tier profile template
+# Build this interactively in assets/tier-profile.html, then paste the generated
+# block into chat or save it as:
+#   <project>/.t3-orca/tiers.yaml   (project scope)
+#   ~/.config/t3-orca/tiers.yaml    (global scope)
+#
+# Modes: a model target, `same tier` reuse, `parent`, or `inherit`.
+# Only the tiers that differ need to be present; the rest use the default table.
+
+tiers:
+  ui: sol6.1 @ high
+  code: deepseek-flash-claude @ high
+  fast: code @ low
+  review: parent

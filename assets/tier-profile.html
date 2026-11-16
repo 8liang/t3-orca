@@ -1,0 +1,2028 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T3 ORCA · Tier Profile</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0c0d;
+    --panel: #121618;
+    --panel-2: #171c1f;
+    --line: #262d31;
+    --line-2: #333c40;
+    --text: #e9eded;
+    --muted: #8d999d;
+    --dim: #5c686c;
+    --accent: #8be9c0;
+    --accent-2: #5fd3a6;
+    --accent-ink: #06251a;
+    --warn: #f0c674;
+    --err: #ff8f8f;
+    --info: #8ab4f8;
+    --radius: 14px;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(900px 520px at 8% -12%, #14221d 0%, transparent 62%),
+      radial-gradient(800px 460px at 100% -6%, #151d26 0%, transparent 58%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  ::selection { background: #2e6b55; color: #fff; }
+
+  .app {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 10px 4px 32px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 4px 18px;
+  }
+
+  .mark {
+    width: 38px;
+    height: 38px;
+    flex: none;
+    border-radius: 11px;
+    border: 1px solid #2d4b41;
+    background: linear-gradient(145deg, #16241f, #0f1513);
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    font: 700 11px/1 var(--mono);
+    letter-spacing: .08em;
+    box-shadow: inset 0 1px 0 #ffffff0d;
+  }
+
+  .topbar h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+  }
+
+  .topbar p {
+    margin: 1px 0 0;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .topbar p strong { color: var(--text); font-weight: 600; }
+
+  .top-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #4a3f22;
+    background: #1d1a10;
+    color: var(--warn);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .badge.live {
+    border-color: #28503f;
+    background: #10211b;
+    color: var(--accent);
+  }
+
+  .badge .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 410px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px 12px;
+  }
+
+  .preset {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--dim);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+
+  .preset select {
+    height: 30px;
+    min-width: 158px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #101416;
+    color: var(--text);
+    font-size: 12.5px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .autosave {
+    margin-left: auto;
+    color: var(--dim);
+    font-size: 11px;
+  }
+
+  .save-row {
+    display: flex;
+    gap: 7px;
+    padding: 0 2px 12px;
+  }
+
+  .save-row[hidden] { display: none; }
+
+  .save-row input {
+    flex: 0 1 280px;
+    height: 31px;
+    padding: 0 10px;
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    background: #0d1113;
+    outline: none;
+  }
+
+  .save-row input:focus { border-color: #4b7d6b; }
+
+  .tier-list {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background:
+      linear-gradient(180deg, #ffffff05, transparent 42%),
+      var(--panel);
+    box-shadow: inset 0 1px 0 #ffffff06;
+    padding: 13px 15px 14px;
+  }
+
+  .card.review-card { border-color: #2b3438; }
+
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+
+  .tier-id {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .tier-key {
+    font: 600 14px/1.4 var(--mono);
+    color: var(--accent);
+    letter-spacing: -.02em;
+  }
+
+  .tier-name-input {
+    width: 108px;
+    padding: 1px 5px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #0e1214;
+    color: var(--accent);
+    font: 600 14px/1.4 var(--mono);
+    outline: none;
+  }
+
+  .tier-name-input:hover { border-color: var(--line); }
+  .tier-name-input:focus { border-color: #4b7d6b; }
+
+  .tier-use {
+    color: var(--dim);
+    font-size: 11.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .head-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pill {
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--line-2);
+    color: var(--muted);
+    font-size: 10.5px;
+    letter-spacing: .02em;
+  }
+
+  .pill.on {
+    border-color: #35604f;
+    background: #12251d;
+    color: var(--accent);
+  }
+
+  .icon-btn {
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--dim);
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .icon-btn:hover { border-color: var(--line-2); color: var(--err); }
+  .icon-btn.armed { border-color: #6b3535; color: var(--err); }
+
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    margin-bottom: 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #0d1113;
+  }
+
+  .seg button {
+    padding: 3px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+
+  .seg button:hover { color: var(--text); }
+
+  .seg button.on {
+    background: #252d30;
+    color: var(--text);
+    box-shadow: inset 0 1px 0 #ffffff10;
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: minmax(120px, .8fr) minmax(180px, 1.25fr);
+    gap: 9px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .field > span {
+    color: var(--dim);
+    font-size: 10.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .field > span.opt-name {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 10.5px;
+  }
+
+  .field > span.opt-name code {
+    color: var(--muted);
+    font: 10px var(--mono);
+  }
+
+  .field select,
+  .field input {
+    width: 100%;
+    height: 31px;
+    padding: 0 9px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #0d1113;
+    color: var(--text);
+    font-size: 12.5px;
+    outline: none;
+    text-overflow: ellipsis;
+  }
+
+  .field select { padding-right: 24px; }
+  .field select:focus, .field input:focus { border-color: #4b7d6b; }
+
+  .field select option[disabled] { color: #5a6468; }
+
+  .custom-input { margin-top: 7px; }
+
+  .card-foot {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #ffffff08;
+  }
+
+  .card-foot .field { width: 150px; flex: none; }
+
+  .alias-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+  }
+
+  .alias-label {
+    color: var(--dim);
+    font-size: 10.5px;
+    margin-right: 2px;
+  }
+
+  .chip {
+    padding: 3px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: #0f1416;
+    color: var(--muted);
+    font: 11px/1.4 var(--mono);
+  }
+
+  .chip:hover {
+    border-color: #3f6f5d;
+    color: var(--accent);
+    background: #102019;
+  }
+
+  .note {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+
+  .note b { color: var(--text); font-weight: 550; }
+
+  .note.warn { color: var(--warn); }
+
+  details.opts {
+    margin-top: 9px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #0e1214;
+  }
+
+  details.opts summary {
+    padding: 7px 10px;
+    color: var(--dim);
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  details.opts summary:hover { color: var(--muted); }
+
+  .opt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 8px;
+    padding: 2px 10px 10px;
+  }
+
+  .add-tier {
+    width: 100%;
+    margin-top: 11px;
+    padding: 11px;
+    border: 1px dashed #35504a;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--accent);
+    font-size: 12.5px;
+  }
+
+  .add-tier:hover { background: #0f1a16; border-color: #4f7f6c; }
+
+  .caps-panel {
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #0e1214;
+  }
+
+  .caps-panel summary {
+    padding: 10px 13px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .caps-body { padding: 0 13px 13px; }
+
+  .caps-hint {
+    margin: 0 0 8px;
+    color: var(--dim);
+    font-size: 11.5px;
+  }
+
+  .caps-body textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #090c0d;
+    color: #c9d4d1;
+    font: 11.5px/1.55 var(--mono);
+    resize: vertical;
+    outline: none;
+  }
+
+  .caps-body textarea:focus { border-color: #4b7d6b; }
+
+  .caps-actions {
+    display: flex;
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .caps-status {
+    margin-top: 8px;
+    color: var(--dim);
+    font-size: 11px;
+  }
+
+  .preview {
+    position: sticky;
+    top: 14px;
+    min-width: 0;
+  }
+
+  .preview-box {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    box-shadow: inset 0 1px 0 #ffffff06;
+    padding: 13px;
+  }
+
+  .preview-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+  }
+
+  .preview-head h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .switch {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--dim);
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .switch input { accent-color: var(--accent-2); }
+
+  pre.yaml {
+    margin: 0;
+    min-height: 250px;
+    max-height: 520px;
+    overflow: auto;
+    padding: 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #080b0c;
+    color: #cfe3db;
+    font: 12px/1.7 var(--mono);
+    tab-size: 2;
+    white-space: pre;
+  }
+
+  pre.yaml .c { color: #5d6d68; }
+  pre.yaml .k { color: #8be9c0; }
+  pre.yaml .v { color: #e8d7a4; }
+  pre.yaml .t { color: #a5c8ff; }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 9px;
+  }
+
+  .btn {
+    height: 32px;
+    padding: 0 11px;
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    background: #171c1f;
+    color: var(--text);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: #445056; background: #1c2326; }
+  .btn.primary {
+    border-color: #57b895;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  .btn.primary:hover { background: #a2f2ce; }
+  .btn.wide { grid-column: span 2; }
+
+  .issues {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 11px 0 0;
+    padding: 0;
+    list-style: none;
+    max-height: 170px;
+    overflow: auto;
+  }
+
+  .issues li {
+    display: grid;
+    grid-template-columns: 7px 1fr;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .issues .dot {
+    width: 5px;
+    height: 5px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: var(--info);
+  }
+
+  .issues li.warn .dot { background: var(--warn); }
+  .issues li.error .dot { background: var(--err); }
+  .issues li.ok .dot { background: var(--accent); }
+  .issues li.error { color: #ffb8b8; }
+  .issues li.warn { color: #e4c68c; }
+
+  .foot-hint {
+    margin: 11px 0 0;
+    padding: 0;
+    color: var(--dim);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .foot-hint code {
+    color: var(--muted);
+    font: 10.5px var(--mono);
+  }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 20;
+    transform: translate(-50%, 10px);
+    padding: 8px 14px;
+    border: 1px solid #35604f;
+    border-radius: 9px;
+    background: #12251d;
+    color: var(--accent);
+    font-size: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+  }
+
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 1060px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .preview { position: static; }
+    pre.yaml { max-height: 420px; }
+  }
+
+  @media (max-width: 560px) {
+    .app { padding-top: 4px; }
+    .topbar { flex-wrap: wrap; }
+    .top-actions { width: 100%; margin-left: 0; }
+    .fields { grid-template-columns: 1fr; }
+    .card-foot { flex-wrap: wrap; }
+    .card-foot .field { width: 100%; }
+    .alias-row { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="mark">ORCA</div>
+    <div>
+      <h1>Tier Profile</h1>
+      <p>为本次 <strong>逐项开发</strong> 指定 tier → provider / model / 强度</p>
+    </div>
+    <div class="top-actions">
+      <span class="badge" id="capsBadge"><span class="dot"></span><span id="capsBadgeText">内置预填目录</span></span>
+      <button type="button" class="btn" id="openCaps">导入 capabilities</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section>
+      <div class="toolbar">
+        <label class="preset">预设
+          <select id="presetSelect"></select>
+        </label>
+        <button type="button" class="btn" id="savePresetBtn">保存为预设</button>
+        <button type="button" class="btn" id="deletePresetBtn" hidden>删除</button>
+        <button type="button" class="btn" id="resetBtn">恢复默认</button>
+        <span class="autosave">当前编辑自动保存</span>
+      </div>
+
+      <div class="save-row" id="saveRow" hidden>
+        <input id="presetName" maxlength="24" placeholder="预设名，例如：重设计 / 赶工">
+        <button type="button" class="btn primary" id="confirmSave">保存</button>
+        <button type="button" class="btn" id="cancelSave">取消</button>
+      </div>
+
+      <div class="tier-list" id="tierList"></div>
+      <button type="button" class="add-tier" id="addTier">+ 添加 tier</button>
+
+      <details class="caps-panel" id="capsPanel">
+        <summary>Capabilities · 校验 provider / model / 选项</summary>
+        <div class="caps-body">
+          <p class="caps-hint">
+            粘贴 <code>orchestrator_capabilities</code> 的 JSON 结果，下拉框和校验会按 live 目录更新。
+            不导入也能用，但提交后仍会按 live capabilities 校验。
+          </p>
+          <textarea id="capsInput" spellcheck="false" placeholder='{"providers":[{"providerInstanceId":"codex","models":[{"id":"gpt-6.1-sol","options":[{"id":"reasoningEffort","values":["low","medium","high"]}]}]}]}'></textarea>
+          <div class="caps-actions">
+            <button type="button" class="btn primary" id="loadCaps">载入 JSON</button>
+            <button type="button" class="btn" id="chooseCapsFile">选择文件…</button>
+            <input type="file" id="capsFile" accept=".json,application/json" hidden>
+            <button type="button" class="btn" id="clearCaps">用回内置目录</button>
+          </div>
+          <div class="caps-status" id="capsStatus">尚未导入 live capabilities。</div>
+        </div>
+      </details>
+    </section>
+
+    <aside class="preview">
+      <div class="preview-box">
+        <div class="preview-head">
+          <h2>生成的 profile</h2>
+          <label class="switch"><input type="checkbox" id="diffOnly"> 仅输出改动</label>
+        </div>
+        <pre class="yaml" id="yamlOut" title="点击全选"></pre>
+        <div class="actions">
+          <button type="button" class="btn primary wide" id="copyYaml">复制 YAML</button>
+          <button type="button" class="btn" id="copyMessage">复制为消息</button>
+          <button type="button" class="btn" id="download">下载 tiers.yaml</button>
+        </div>
+        <ul class="issues" id="issues"></ul>
+        <p class="foot-hint">
+          只改需要变的 tier；未列出的沿用默认。可粘贴回聊天，或保存到
+          <code>.t3-orca/tiers.yaml</code>。review 目标仍会按 live capabilities 校验。
+        </p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "t3orca" + ".tier-profile.v2";
+  const EFFORT_KEYS = ["reasoningEffort", "effort", "reasoning_effort", "thinking_level", "thinking", "mode"];
+  const ROLES = ["design", "implementation", "test", "review", "research", "general"];
+  const ROLE_BY_TIER = {
+    ui: "design",
+    design: "design",
+    code: "implementation",
+    fast: "implementation",
+    test: "test",
+    review: "review",
+    research: "research"
+  };
+  const TIER_META = {
+    ui: { use: "UI / 设计 / 视觉", short: "UI" },
+    code: { use: "纯代码 / 重构 / bugfix", short: "代码" },
+    fast: { use: "机械修改 / 小测试改动", short: "快速" },
+    review: { use: "每个 item 的 Review", short: "审查" }
+  };
+  const MODE_LABEL = { target: "模型", same: "复用", parent: "父线程", inherit: "继承" };
+
+  const SEED_PROVIDERS = [
+    {
+      id: "codex",
+      displayName: "Codex",
+      driverKind: "codex",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", options: [effort("reasoningEffort")] },
+        { id: "gpt-6.1-terra", label: "GPT-6.1 Terra", options: [effort("reasoningEffort")] }
+      ]
+    },
+    {
+      id: "magpie",
+      displayName: "Magpie (Claude)",
+      driverKind: "claudeAgent",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "dumate/deepseek-v41-flash[1m]", label: "DeepSeek V4.1 Flash 1M", options: [effort("effort")] }
+      ]
+    },
+    {
+      id: "magpie-codex",
+      displayName: "Magpie (Codex)",
+      driverKind: "codex",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "dumate/deepseek-v41-flash", label: "DeepSeek V4.1 Flash", options: [effort("effort")] }
+      ]
+    },
+    {
+      id: "claudeAgent",
+      displayName: "Claude Agent",
+      driverKind: "claudeAgent",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "claude-opus-5-5", label: "Claude Opus 5.5", options: [effort("effort")] },
+        { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", options: [effort("effort")] },
+        { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", options: [effort("effort")] }
+      ]
+    },
+    {
+      id: "cursor",
+      displayName: "Cursor",
+      driverKind: "cursor",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "claude-opus-5-5", label: "Claude Opus 5.5", options: [effort("effort")] },
+        { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", options: [effort("effort")] }
+      ]
+    },
+    {
+      id: "antigravity",
+      displayName: "Antigravity",
+      driverKind: "antigravity",
+      canRunChildTask: true,
+      constraints: [],
+      models: [
+        { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", options: [effort("thinking_level")] }
+      ]
+    }
+  ];
+
+  const ALIASES = [
+    { name: "sol6.1", providers: ["codex"], model: "gpt-6.1-sol", effort: { id: "reasoningEffort", value: "high" } },
+    { name: "deepseek-flash-claude", providers: ["magpie"], model: "dumate/deepseek-v41-flash[1m]", driverKind: "claudeAgent", effort: { id: "effort", value: "high" } },
+    { name: "deepseek-flash", providers: ["magpie", "magpie-codex"], model: "dumate/deepseek-v41-flash[1m]", driverKind: "claudeAgent", effort: { id: "effort", value: "high" } },
+    { name: "opus", providers: ["claudeAgent", "cursor"], model: "claude-opus-5-5", effort: { id: "effort", value: "high" } },
+    { name: "sonnet", providers: ["claudeAgent", "cursor"], model: "claude-sonnet-5-5", effort: { id: "effort", value: "high" } },
+    { name: "haiku", providers: ["claudeAgent"], model: "claude-haiku-5-5", effort: { id: "effort", value: "low" } },
+    { name: "gemini-flash", providers: ["antigravity", "gemini"], model: "gemini-3.8-flash", effort: { id: "thinking_level", value: "high" } }
+  ];
+
+  const DEFAULT_TIERS = {
+    ui: { mode: "target", provider: "codex", model: "gpt-6.1-sol", role: "design", options: { reasoningEffort: "high" } },
+    code: { mode: "target", provider: "magpie", model: "dumate/deepseek-v41-flash[1m]", role: "implementation", options: { effort: "high" } },
+    fast: { mode: "same", ref: "code", role: "implementation", options: { effort: "low" } },
+    review: { mode: "parent", role: "review", options: {} }
+  };
+  const DEFAULT_ORDER = ["ui", "code", "fast", "review"];
+
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  const esc = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+
+  function effort(id) {
+    return { id, values: ["low", "medium", "high", "max"], default: "medium" };
+  }
+
+  let state = loadState();
+  const storageAvailable = (() => {
+    try {
+      const probe = STORAGE_KEY + ".probe";
+      localStorage.setItem(probe, "1");
+      localStorage.removeItem(probe);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  let openOpts = new Set();
+  const customProvider = new Set();
+  const customModel = new Set();
+  let pendingDelete = null;
+  let deleteTimer = null;
+
+  function loadState() {
+    const fresh = {
+      tiers: clone(DEFAULT_TIERS),
+      order: [...DEFAULT_ORDER],
+      diffOnly: false,
+      caps: null,
+      presets: {},
+      activePreset: null
+    };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fresh;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved !== "object" || !saved.tiers || !Array.isArray(saved.order)) return fresh;
+      const tiers = {};
+      const order = [];
+      for (const key of saved.order) {
+        const tier = saved.tiers[key];
+        if (!tier || typeof tier !== "object" || !["target", "same", "parent", "inherit"].includes(tier.mode)) continue;
+        tiers[key] = {
+          mode: tier.mode,
+          provider: typeof tier.provider === "string" ? tier.provider : undefined,
+          model: typeof tier.model === "string" ? tier.model : undefined,
+          ref: typeof tier.ref === "string" ? tier.ref : undefined,
+          role: ROLES.includes(tier.role) ? tier.role : inferRole(key),
+          options: tier.options && typeof tier.options === "object" ? { ...tier.options } : {}
+        };
+        order.push(key);
+      }
+      if (!order.length) return fresh;
+      return {
+        tiers,
+        order,
+        diffOnly: Boolean(saved.diffOnly),
+        caps: null,
+        presets: sanitizePresets(saved.presets),
+        activePreset: typeof saved.activePreset === "string" ? saved.activePreset : null
+      };
+    } catch {
+      return fresh;
+    }
+  }
+
+  function sanitizePresets(raw) {
+    if (!raw || typeof raw !== "object") return {};
+    const out = {};
+    for (const [name, preset] of Object.entries(raw)) {
+      if (!preset || !preset.tiers || !Array.isArray(preset.order)) continue;
+      out[name] = preset;
+    }
+    return out;
+  }
+
+  function persist() {
+    const payload = {
+      tiers: state.tiers,
+      order: state.order,
+      diffOnly: state.diffOnly,
+      presets: state.presets,
+      activePreset: state.activePreset
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+  }
+
+  function inferRole(key) {
+    return ROLE_BY_TIER[key] || "implementation";
+  }
+
+  function catalog() {
+    return state.caps ? state.caps.providers : SEED_PROVIDERS;
+  }
+
+  function providerById(id) {
+    return catalog().find((provider) => provider.id === id);
+  }
+
+  function providerEligible(provider) {
+    return Boolean(provider) && provider.canRunChildTask !== false && (!provider.constraints || provider.constraints.length === 0);
+  }
+
+  function modelById(provider, modelId) {
+    if (!provider) return null;
+    return (provider.models || []).find((model) => model.id === modelId) || null;
+  }
+
+  function primaryOptionFor(tier) {
+    const model = modelById(providerById(tier.provider), tier.model);
+    if (!model || !Array.isArray(model.options) || !model.options.length) return null;
+    return model.options.find((option) => EFFORT_KEYS.includes(option.id)) || model.options[0];
+  }
+
+  function primaryOptionAt(providerId, modelId) {
+    const model = modelById(providerById(providerId), modelId);
+    if (!model || !Array.isArray(model.options) || !model.options.length) return null;
+    return model.options.find((option) => EFFORT_KEYS.includes(option.id)) || model.options[0];
+  }
+
+  function resolveBase(tier, seen) {
+    if (!tier) return null;
+    if (tier.mode !== "same") return tier;
+    const guard = seen || new Set();
+    if (!tier.ref || guard.has(tier.ref)) return null;
+    guard.add(tier.ref);
+    const base = resolveBase(state.tiers[tier.ref], guard);
+    if (!base) return null;
+    return {
+      ...base,
+      options: { ...(base.options || {}), ...cleanOptions(tier.options) }
+    };
+  }
+
+  function cleanOptions(options) {
+    const out = {};
+    for (const [key, value] of Object.entries(options || {})) {
+      if (value === "" || value == null) continue;
+      out[key] = value;
+    }
+    return out;
+  }
+
+  function parseOptionsText(text) {
+    const out = {};
+    for (const part of String(text || "").split(",")) {
+      const entry = part.trim();
+      if (!entry) continue;
+      const index = entry.indexOf("=");
+      if (index <= 0) continue;
+      const key = entry.slice(0, index).trim();
+      const value = entry.slice(index + 1).trim();
+      if (key && value) out[key] = value;
+    }
+    return out;
+  }
+
+  function sameOverrides(tier) {
+    const base = resolveBase({ ...tier, options: {} });
+    const baseOptions = cleanOptions(base?.options);
+    const overrides = cleanOptions(tier.options);
+    const out = {};
+    for (const [key, value] of Object.entries(overrides)) {
+      if (String(baseOptions[key] ?? "") !== String(value)) out[key] = value;
+    }
+    return out;
+  }
+
+  function canonical(tier) {
+    if (!tier) return "";
+    return JSON.stringify({
+      mode: tier.mode,
+      provider: tier.provider || "",
+      model: tier.model || "",
+      ref: tier.ref || "",
+      role: tier.role || "",
+      options: Object.fromEntries(Object.entries(cleanOptions(tier.options)).sort(([a], [b]) => a.localeCompare(b)))
+    });
+  }
+
+  function isDefaultTier(key) {
+    return canonical(state.tiers[key]) === canonical(DEFAULT_TIERS[key]);
+  }
+
+  function yamlScalar(value) {
+    const text = String(value);
+    if (/^[A-Za-z0-9_./[\]-]+$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) {
+      return text;
+    }
+    return JSON.stringify(text);
+  }
+
+  function optionSuffix(options, primaryId) {
+    const entries = Object.entries(cleanOptions(options));
+    if (!entries.length) return "";
+    if (entries.length === 1 && entries[0][0] === primaryId) {
+      const value = String(entries[0][1]);
+      if (/^[A-Za-z0-9_.-]+$/.test(value)) return " @ " + value;
+    }
+    return " @ " + entries.map(([key, value]) => `${key}=${yamlScalar(value)}`).join(", ");
+  }
+
+  function compactOptions(options) {
+    return Object.entries(cleanOptions(options)).every(([key, value]) =>
+      /^[A-Za-z0-9_.-]+$/.test(key) && /^[A-Za-z0-9_.-]+$/.test(String(value))
+    );
+  }
+
+  function aliasFor(providerId, modelId) {
+    return ALIASES.find((alias) =>
+      alias.providers.includes(providerId) &&
+      alias.model === modelId
+    ) || null;
+  }
+
+  function compactSafe(value) {
+    return /^[A-Za-z0-9_./[\]-]+$/.test(String(value));
+  }
+
+  function tierToYaml(key, tier) {
+    const role = tier.role || inferRole(key);
+    const roleMatters = role !== inferRole(key);
+
+    if (tier.mode === "parent") return `  ${key}: parent`;
+    if (tier.mode === "inherit") return `  ${key}: inherit`;
+
+    if (tier.mode === "same") {
+      if (!tier.ref) return `  # ${key}: 未选择复用目标`;
+      const base = resolveBase(tier);
+      const overrides = sameOverrides(tier);
+      if (roleMatters || !compactOptions(overrides) || !base) {
+        return expandedYaml(key, { ...base, provider: base?.provider || "", model: base?.model || "", role });
+      }
+      return `  ${key}: ${tier.ref}${optionSuffix(overrides, primaryOptionFor(base)?.id)}`;
+    }
+
+    if (!tier.provider || !tier.model) {
+      return `  # ${key}: 未选择 provider / model`;
+    }
+
+    const alias = aliasFor(tier.provider, tier.model);
+    const compactTarget = compactSafe(tier.provider) && compactSafe(tier.model) && !roleMatters;
+    const primaryId = primaryOptionFor(tier)?.id;
+    if (!compactOptions(tier.options)) return expandedYaml(key, tier);
+    if (alias && compactTarget) {
+      return `  ${key}: ${alias.name}${optionSuffix(tier.options, primaryId)}`;
+    }
+    if (compactTarget) {
+      return `  ${key}: ${tier.provider}:${tier.model}${optionSuffix(tier.options, primaryId)}`;
+    }
+    return expandedYaml(key, tier);
+  }
+
+  function expandedYaml(key, tier) {
+    const lines = [`  ${key}:`];
+    lines.push(`    provider: ${yamlScalar(tier.provider || "")}`);
+    lines.push(`    model: ${yamlScalar(tier.model || "")}`);
+    const role = tier.role || inferRole(key);
+    if (role !== inferRole(key)) lines.push(`    role: ${role}`);
+    const options = Object.entries(cleanOptions(tier.options));
+    if (options.length) {
+      lines.push("    options:");
+      for (const [optKey, value] of options) {
+        lines.push(`      ${optKey}: ${yamlScalar(value)}`);
+      }
+    }
+    return lines.join("\n");
+  }
+
+  function generateYaml() {
+    const keys = state.order.filter((key) => state.tiers[key]);
+    const shown = state.diffOnly ? keys.filter((key) => !isDefaultTier(key)) : keys;
+    const lines = [];
+    if (state.diffOnly) {
+      lines.push("# 仅列出与默认 profile 不同的 tier");
+    }
+    if (!shown.length) {
+      lines.push("tiers: {}");
+      return lines.join("\n");
+    }
+    lines.push("tiers:");
+    for (const key of shown) {
+      lines.push(tierToYaml(key, state.tiers[key]));
+    }
+    if (!lines.slice(1).some((line) => /^\s{2}[a-z][a-z0-9_-]*:/.test(line))) {
+      return "tiers: {}";
+    }
+    return lines.join("\n");
+  }
+
+  function highlightYaml(text) {
+    return text.split("\n").map((line) => {
+      if (line.trimStart().startsWith("#")) return `<span class="c">${esc(line)}</span>`;
+      const match = line.match(/^(\s*)([A-Za-z0-9_-]+):(\s*)(.*)$/);
+      if (!match) return esc(line);
+      const [, indent, key, space, rest] = match;
+      let valueHtml = esc(rest);
+      if (rest === "parent" || rest === "inherit") {
+        valueHtml = `<span class="t">${esc(rest)}</span>`;
+      } else if (rest.startsWith('"')) {
+        valueHtml = `<span class="v">${esc(rest)}</span>`;
+      } else if (rest) {
+        const at = rest.indexOf(" @ ");
+        if (at >= 0) {
+          valueHtml = `<span class="t">${esc(rest.slice(0, at))}</span><span class="v">${esc(rest.slice(at))}</span>`;
+        } else {
+          valueHtml = `<span class="t">${esc(rest)}</span>`;
+        }
+      }
+      return `${esc(indent)}<span class="k">${esc(key)}</span>:${esc(space)}${valueHtml}`;
+    }).join("\n");
+  }
+
+  function tierCard(key) {
+    const tier = state.tiers[key];
+    const meta = TIER_META[key];
+    const custom = !meta;
+    const isReview = key === "review";
+    const modes = isReview ? ["parent", "target", "inherit"] : ["target", "same", "parent", "inherit"];
+    const armed = pendingDelete === key;
+
+    const modeButtons = modes.map((mode) =>
+      `<button type="button" data-act="mode" data-mode="${mode}" class="${tier.mode === mode ? "on" : ""}">${MODE_LABEL[mode]}</button>`
+    ).join("");
+
+    let body = "";
+    if (tier.mode === "target") {
+      const knownProvider = providerById(tier.provider);
+      const providerIsKnown = Boolean(knownProvider);
+      const providerCustom = customProvider.has(key) || !providerIsKnown;
+      const provider = providerCustom ? null : knownProvider;
+      const providerValue = providerCustom ? "__custom__" : tier.provider;
+      const providerOptions = [
+        ...(providerCustom ? [`<option value="__custom__" selected>自定义…</option>`] : []),
+        ...catalog().map((item) => {
+          const suffix = providerEligible(item) ? "" : "（不可委派）";
+          return `<option value="${esc(item.id)}" ${!providerCustom && item.id === tier.provider ? "selected" : ""}>${esc(item.displayName || item.id)}${suffix}</option>`;
+        }),
+        `<option value="__custom__" ${providerCustom ? "hidden" : ""}>自定义…</option>`
+      ].join("");
+
+      const models = provider && Array.isArray(provider.models) ? provider.models : [];
+      const modelIsKnown = Boolean(modelById(provider, tier.model));
+      const modelCustom = customModel.has(key) || !modelIsKnown;
+      const modelValue = modelCustom ? "__custom__" : tier.model;
+      const modelOptions = [
+        ...(modelCustom ? [`<option value="__custom__" selected>自定义…</option>`] : []),
+        ...models.map((model) =>
+          `<option value="${esc(model.id)}" ${!modelCustom && model.id === tier.model ? "selected" : ""}>${esc(model.label || model.id)}${model.label && model.label !== model.id ? " · " + esc(model.id) : ""}</option>`
+        ),
+        `<option value="__custom__" ${modelCustom ? "hidden" : ""}>自定义…</option>`
+      ].join("");
+
+      const primary = primaryOptionFor(tier);
+      const currentEffort = primary ? (tier.options?.[primary.id] ?? "") : "";
+      const effortValues = primary && Array.isArray(primary.values) ? primary.values.map(String) : [];
+      if (currentEffort && !effortValues.includes(String(currentEffort))) effortValues.push(String(currentEffort));
+      const effortSelect = primary
+        ? `<label class="field"><span class="opt-name">强度 · <code>${esc(primary.id)}</code></span>
+            <select data-field="effort">
+              <option value="">模型默认${primary.default != null ? "（" + esc(primary.default) + "）" : ""}</option>
+              ${effortValues.map((value) => `<option value="${esc(value)}" ${String(currentEffort) === value ? "selected" : ""}>${esc(value)}${!primary.values.map(String).includes(value) ? "（未声明）" : ""}</option>`).join("")}
+            </select>
+          </label>`
+        : "";
+      const optionsText = Object.entries(cleanOptions(tier.options)).map(([key, value]) => `${key}=${value}`).join(", ");
+      const optionsInput = (providerCustom || modelCustom) && !primary
+        ? `<label class="field custom-input"><span>options（key=value，逗号分隔）</span><input data-field="optionsText" value="${esc(optionsText)}" placeholder="effort=high, contextWindow=1m" spellcheck="false"></label>`
+        : "";
+
+      const extraOptions = primary && provider && modelById(provider, tier.model)
+        ? (modelById(provider, tier.model).options || []).filter((option) => option.id !== primary.id)
+        : [];
+      const open = openOpts.has(key);
+      const extraBlock = extraOptions.length
+        ? `<details class="opts" data-opts="${esc(key)}" ${open ? "open" : ""}>
+            <summary>其他选项 · ${extraOptions.length}</summary>
+            <div class="opt-grid">
+              ${extraOptions.map((option) => {
+                const value = tier.options?.[option.id] ?? "";
+                const values = (option.values || []).map(String);
+                if (value && !values.includes(String(value))) values.push(String(value));
+                return `<label class="field"><span>${esc(option.id)}</span>
+                  <select data-field="extra" data-opt="${esc(option.id)}">
+                    <option value="">默认${option.default != null ? "（" + esc(option.default) + "）" : ""}</option>
+                    ${values.map((item) => `<option value="${esc(item)}" ${String(value) === item ? "selected" : ""}>${esc(item)}</option>`).join("")}
+                  </select>
+                </label>`;
+              }).join("")}
+            </div>
+          </details>`
+        : "";
+
+      body = `
+        <div class="fields">
+          <label class="field"><span>Provider</span><select data-field="provider">${providerOptions}</select></label>
+          <label class="field"><span>Model</span><select data-field="model">${modelOptions}</select></label>
+        </div>
+        ${providerValue === "__custom__"
+          ? `<label class="field custom-input"><span>自定义 providerInstanceId</span><input data-field="providerText" value="${esc(tier.provider || "")}" placeholder="例如 magpie" spellcheck="false"></label>`
+          : ""}
+        ${modelValue === "__custom__"
+          ? `<label class="field custom-input"><span>自定义 model id</span><input data-field="modelText" value="${esc(tier.model || "")}" placeholder="例如 dumate/deepseek-v41-flash[1m]" spellcheck="false"></label>`
+          : ""}
+        ${optionsInput}
+        ${effortSelect}
+        ${extraBlock}
+      `;
+    } else if (tier.mode === "same") {
+      const others = state.order.filter((item) => item !== key && state.tiers[item]);
+      const refOptions = others.map((item) =>
+        `<option value="${esc(item)}" ${item === tier.ref ? "selected" : ""}>${esc(item)}</option>`
+      ).join("");
+      const base = resolveBase(tier);
+      const primary = base ? primaryOptionFor(base) : null;
+      const values = primary && Array.isArray(primary.values) ? primary.values.map(String) : ["low", "medium", "high", "max"];
+      const current = primary ? (tier.options?.[primary.id] ?? "") : "";
+      if (current && !values.includes(String(current))) values.push(String(current));
+      body = `
+        <div class="fields">
+          <label class="field"><span>复用 tier</span><select data-field="ref">${refOptions || '<option value="">无可用 tier</option>'}</select></label>
+          <label class="field"><span>强度覆盖</span>
+            <select data-field="refEffort">
+              <option value="">跟随 ${esc(tier.ref || "目标 tier")}</option>
+              ${values.map((value) => `<option value="${esc(value)}" ${String(current) === value ? "selected" : ""}>${esc(value)}${!primary || !(primary.values || []).map(String).includes(value) ? "（未声明）" : ""}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <p class="note">provider / model 跟随 <b>${esc(tier.ref || "…")}</b>，只覆盖强度${tier.ref && state.tiers[tier.ref] ? `；当前解析为 <b>${esc(state.tiers[tier.ref].provider || "inherit")}</b>` : ""}。</p>
+      `;
+    } else if (tier.mode === "parent") {
+      body = `<p class="note">${isReview
+        ? "父线程自己 Review，不委派。发现的问题用 <b>t3_thread_send</b> 回原 child thread 修复。"
+        : "父线程不是模型 tier；只有 <b>review</b> 适合设为父线程，其他 tier 请选模型。"}</p>`;
+    } else {
+      body = `<p class="note">子 agent 继承父线程的 provider、model 和 options。适合临时兜底，不记录具体目标。</p>`;
+    }
+
+    const aliasChips = tier.mode === "target"
+      ? `<div class="alias-row"><span class="alias-label">快捷</span>${aliasesFor(key).map((alias) =>
+          `<button type="button" class="chip" data-act="alias" data-alias="${esc(alias.name)}">${esc(alias.name)}</button>`
+        ).join("")}</div>`
+      : "";
+
+    return `
+      <article class="card ${isReview ? "review-card" : ""}" data-tier="${esc(key)}">
+        <div class="card-head">
+          <div class="tier-id">
+            ${custom
+              ? `<input class="tier-name-input" data-field="name" value="${esc(key)}" aria-label="tier 名称" spellcheck="false">`
+              : `<span class="tier-key">${esc(key)}</span>`}
+            <span class="tier-use">${esc(meta ? meta.use : "自定义 tier")}</span>
+          </div>
+          <div class="head-right">
+            ${isReview ? `<span class="pill ${tier.mode === "parent" ? "on" : ""}">${tier.mode === "parent" ? "父线程" : "委派"}</span>` : ""}
+            ${custom ? `<button type="button" class="icon-btn ${armed ? "armed" : ""}" data-act="remove" title="${armed ? "再次点击确认删除" : "删除 tier"}">${armed ? "!" : "×"}</button>` : ""}
+          </div>
+        </div>
+        <div class="seg" role="group" aria-label="${esc(key)} 模式">${modeButtons}</div>
+        ${body}
+        <div class="card-foot">
+          <label class="field"><span>role</span>
+            <select data-field="role">
+              ${ROLES.map((role) => `<option value="${role}" ${role === (tier.role || inferRole(key)) ? "selected" : ""}>${role}</option>`).join("")}
+            </select>
+          </label>
+          ${aliasChips}
+        </div>
+      </article>
+    `;
+  }
+
+  function aliasesFor(key) {
+    if (key === "ui" || key === "design") return ALIASES.filter((alias) => alias.name === "sol6.1" || alias.name === "opus");
+    if (key === "code" || key === "fast") return ALIASES.filter((alias) => alias.name.includes("deepseek") || alias.name === "sol6.1");
+    if (key === "review") return ALIASES.filter((alias) => ["opus", "sonnet"].includes(alias.name));
+    return ALIASES.filter((alias) => ["sol6.1", "opus", "gemini-flash"].includes(alias.name));
+  }
+
+  function renderCards() {
+    const list = document.getElementById("tierList");
+    list.innerHTML = state.order.filter((key) => state.tiers[key]).map(tierCard).join("");
+  }
+
+  function renderYaml() {
+    const output = generateYaml();
+    const node = document.getElementById("yamlOut");
+    node.innerHTML = highlightYaml(output);
+    node.dataset.raw = output;
+  }
+
+  function renderIssues() {
+    const issues = validate();
+    const list = document.getElementById("issues");
+    list.innerHTML = issues.map((issue) =>
+      `<li class="${issue.level}"><span class="dot"></span><span>${esc(issue.text)}</span></li>`
+    ).join("");
+    return issues;
+  }
+
+  function validate() {
+    const issues = [];
+    const seen = new Set();
+    const add = (level, text) => {
+      const fingerprint = level + "|" + text;
+      if (seen.has(fingerprint)) return;
+      seen.add(fingerprint);
+      issues.push({ level, text });
+    };
+
+    if (!state.caps) {
+      add("info", "当前使用内置预填目录；提交后仍会按 live capabilities 校验，不可用会报告替换。");
+    } else {
+      const omitted = state.caps.providers.reduce((sum, provider) => sum + (provider.omittedModels || 0), 0);
+      add("ok", `已载入 ${state.caps.providers.length} 个 provider · ${state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0)} 个 model${omitted ? `（另有 ${omitted} 个未列出，必要时用 search）` : ""}。`);
+    }
+
+    for (const key of state.order) {
+      const tier = state.tiers[key];
+      if (!tier) continue;
+
+      if (key !== "review" && tier.mode === "parent") {
+        add("warn", `${key}: 只有 review tier 适合 “父线程”；当前设置不会给该 item 指定模型。`);
+      }
+
+      if (tier.mode === "same") {
+        if (!tier.ref || !state.tiers[tier.ref]) {
+          add("error", `${key}: 复用目标不存在，请选择一个 tier。`);
+        } else if (state.tiers[tier.ref].mode === "parent") {
+          add("error", `${key}: 复用目标 ${tier.ref} 是父线程，没有 provider/model；改用 inherit 或指定模型。`);
+        }
+        if ((tier.role || inferRole(key)) !== inferRole(key)) {
+          add("info", `${key}: role 不是默认值，YAML 会展开成固定目标，不再跟随 ${tier.ref || "复用 tier"} 的后续改动。`);
+        }
+      }
+
+      if (tier.mode !== "target") continue;
+      if (!tier.provider || !tier.model) {
+        add("error", `${key}: 需要同时选择 provider 和 model。`);
+        continue;
+      }
+
+      if (!state.caps) {
+        const alias = aliasFor(tier.provider, tier.model);
+        if (!alias && !providerById(tier.provider)) {
+          add("warn", `${key}: 内置目录里没有 provider ${tier.provider}；导入 capabilities 才能校验。`);
+        }
+        continue;
+      }
+
+      const provider = providerById(tier.provider);
+      if (!provider) {
+        add("error", `${key}: capabilities 中没有 provider “${tier.provider}”。可能被截断，先用 search 查找。`);
+        continue;
+      }
+      if (!providerEligible(provider)) {
+        add("error", `${key}: provider ${provider.displayName || provider.id} 不可运行子任务（canRunChildTask 为 false 或有 constraints）。`);
+      }
+      const model = modelById(provider, tier.model);
+      if (!model) {
+        const byLabel = (provider.models || []).filter((item) => (item.label || "").toLowerCase() === String(tier.model).toLowerCase());
+        add("error", byLabel.length === 1
+          ? `${key}: “${tier.model}” 是 label，不是 model id；请改用 ${byLabel[0].id}。`
+          : `${key}: provider ${provider.id} 下没有 model “${tier.model}”。`);
+        continue;
+      }
+      const options = model.options || [];
+      for (const [optionId, value] of Object.entries(cleanOptions(tier.options))) {
+        const option = options.find((item) => item.id === optionId);
+        if (!option) {
+          add("error", `${key}: model ${model.id} 没有选项 ${optionId}。`);
+        } else if (Array.isArray(option.values) && option.values.length && !option.values.map(String).includes(String(value))) {
+          add("error", `${key}: ${optionId}=${value} 不在允许值 [${option.values.join(", ")}] 中。`);
+        }
+      }
+    }
+
+    if (state.tiers.review && state.tiers.review.mode === "target") {
+      add("warn", "review 指定了模型：每轮 Review 会新建 delegate，token 成本高于父线程自审。");
+    }
+
+    if (!issues.some((issue) => issue.level === "error") && state.caps) {
+      add("ok", "目标均通过当前 capabilities 校验。");
+    }
+
+    return issues;
+  }
+
+  function renderCapsBadge() {
+    const badge = document.getElementById("capsBadge");
+    const text = document.getElementById("capsBadgeText");
+    const status = document.getElementById("capsStatus");
+    if (state.caps) {
+      badge.classList.add("live");
+      const count = state.caps.providers.length;
+      text.textContent = `live · ${count} provider${count === 1 ? "" : "s"}`;
+      status.textContent = `已载入 live capabilities：${count} 个 provider，${state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0)} 个 model。`;
+    } else {
+      badge.classList.remove("live");
+      text.textContent = "内置预填目录";
+      status.textContent = "尚未导入 live capabilities。";
+    }
+  }
+
+  function renderPresets() {
+    const select = document.getElementById("presetSelect");
+    const names = Object.keys(state.presets).sort((a, b) => a.localeCompare(b));
+    select.innerHTML = [
+      `<option value="__current">当前编辑${state.activePreset ? "（未保存）" : ""}</option>`,
+      ...names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`)
+    ].join("");
+    select.value = state.activePreset && state.presets[state.activePreset] ? state.activePreset : "__current";
+    document.getElementById("deletePresetBtn").hidden = !(state.activePreset && state.presets[state.activePreset]);
+  }
+
+  function render(options) {
+    const opts = options || {};
+    if (opts.cards !== false) renderCards();
+    renderYaml();
+    renderIssues();
+    renderCapsBadge();
+    if (opts.presets !== false) renderPresets();
+    document.querySelector(".autosave").textContent = storageAvailable
+      ? "当前编辑自动保存"
+      : "此窗口不能本地保存；请复制或下载";
+    persist();
+  }
+
+  function setOption(tier, optionId, value) {
+    if (!tier.options) tier.options = {};
+    if (value === "" || value == null) delete tier.options[optionId];
+    else tier.options[optionId] = String(value);
+  }
+
+  function ensureTarget(key) {
+    const tier = state.tiers[key];
+    if (tier.mode !== "target" || (tier.provider && tier.model)) return;
+    const alias = ALIASES.find((item) =>
+      (key === "ui" && item.name === "sol6.1") ||
+      (key === "code" && item.name === "deepseek-flash-claude") ||
+      (key === "review" && item.name === "opus")
+    );
+    if (alias) {
+      applyAlias(key, alias.name, false);
+      return;
+    }
+    if (tier.ref && state.tiers[tier.ref]) {
+      const base = resolveBase(state.tiers[tier.ref]);
+      if (base?.provider && base?.model) {
+        tier.provider = base.provider;
+        tier.model = base.model;
+        tier.options = { ...(base.options || {}) };
+        tier.role = tier.role || base.role || inferRole(key);
+        return;
+      }
+    }
+    const provider = catalog().find(providerEligible) || catalog()[0];
+    tier.provider = provider?.id || "codex";
+    tier.model = provider?.models?.[0]?.id || "gpt-6.1-sol";
+    tier.role = tier.role || inferRole(key);
+  }
+
+  function applyAlias(key, name, rerender) {
+    const alias = ALIASES.find((item) => item.name === name);
+    if (!alias) return;
+    const tier = state.tiers[key];
+    const candidates = alias.providers
+      .map((providerId) => providerById(providerId))
+      .filter((provider) => provider && providerEligible(provider) && aliasModelIn(provider, alias));
+    const driverPreferred = alias.driverKind
+      ? candidates.find((provider) => provider.driverKind === alias.driverKind)
+      : null;
+    const provider = driverPreferred || candidates[0] || null;
+    if (!provider) {
+      toast(`目录中没有 ${alias.name} 的可用目标`);
+      return;
+    }
+    tier.mode = "target";
+    tier.provider = provider.id;
+    tier.model = aliasModelIn(provider, alias);
+    tier.role = tier.role || inferRole(key);
+    customProvider.delete(key);
+    customModel.delete(key);
+    pruneOptions(tier);
+    if (alias.effort) {
+      const primary = primaryOptionAt(tier.provider, tier.model);
+      if (primary) {
+        const allowed = (primary.values || []).map(String);
+        if (!allowed.length || allowed.includes(alias.effort.value)) {
+          tier.options = { ...cleanOptions(tier.options), [primary.id]: alias.effort.value };
+        }
+      } else if (!modelById(provider, tier.model)) {
+        tier.options = { ...cleanOptions(tier.options), [alias.effort.id]: alias.effort.value };
+      }
+    }
+    if (rerender !== false) {
+      markEdited();
+      render();
+    }
+  }
+
+  function aliasModelIn(provider, alias) {
+    const models = provider && Array.isArray(provider.models) ? provider.models : [];
+    const exact = models.find((model) => model.id === alias.model);
+    if (exact) return exact.id;
+    const base = alias.model.replace(/\[[^\]]*\]$/, "");
+    const match = models.find((model) => model.id === base || model.id.startsWith(base + "["));
+    return match ? match.id : "";
+  }
+
+  function markEdited() {
+    state.activePreset = null;
+  }
+
+  function pruneOptions(tier) {
+    const model = modelById(providerById(tier.provider), tier.model);
+    if (!model) return;
+    const valid = new Set((model.options || []).map((option) => option.id));
+    for (const optionId of Object.keys(tier.options || {})) {
+      if (!valid.has(optionId)) delete tier.options[optionId];
+    }
+  }
+
+  function focusField(key, fieldName) {
+    requestAnimationFrame(() => {
+      const field = document.querySelector(`[data-tier="${CSS.escape(key)}"] [data-field="${fieldName}"]`);
+      if (!field) return;
+      field.focus();
+      if (typeof field.select === "function") field.select();
+    });
+  }
+
+  function toast(message) {
+    const node = document.getElementById("toast");
+    node.textContent = message;
+    node.classList.add("show");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => node.classList.remove("show"), 1800);
+  }
+
+  async function copyText(text, label) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try { document.execCommand("copy"); } catch {}
+      textarea.remove();
+    }
+    toast(label + "已复制");
+  }
+
+  function normalizeCaps(raw) {
+    let payload = raw;
+    if (payload && Array.isArray(payload.content)) {
+      const text = payload.content.find((item) => item && typeof item.text === "string")?.text;
+      if (text) payload = JSON.parse(text);
+    }
+    if (payload && payload.result && !payload.providers) payload = payload.result;
+    if (payload && payload.structuredContent && payload.structuredContent.providers) payload = payload.structuredContent;
+    if (!payload || !Array.isArray(payload.providers)) {
+      throw new Error("JSON 里没有 providers 数组");
+    }
+    return {
+      providers: payload.providers.map((provider) => {
+        const id = provider.providerInstanceId || provider.id || provider.providerId;
+        if (!id) throw new Error("有 provider 缺少 providerInstanceId / id");
+        return {
+          id: String(id),
+          displayName: provider.displayName || provider.label || String(id),
+          driverKind: provider.driverKind || "",
+          canRunChildTask: provider.canRunChildTask !== false,
+          canRunCrossProviderChildTask: provider.canRunCrossProviderChildTask !== false,
+          constraints: Array.isArray(provider.constraints) ? provider.constraints : [],
+          omittedModels: Number(provider.omittedModels) || 0,
+          models: (Array.isArray(provider.models) ? provider.models : []).map((model) => ({
+            id: String(model.id),
+            label: model.label || String(model.id),
+            options: (Array.isArray(model.options) ? model.options : []).map((option) => ({
+              id: String(option.id),
+              values: Array.isArray(option.values) ? option.values : [],
+              default: option.default
+            }))
+          }))
+        };
+      })
+    };
+  }
+
+  function applyCapsText(text) {
+    try {
+      const parsed = JSON.parse(text);
+      state.caps = normalizeCaps(parsed);
+      document.getElementById("capsPanel").open = false;
+      render();
+      toast(`已载入 ${state.caps.providers.length} 个 provider`);
+    } catch (error) {
+      toast("JSON 无效：" + error.message);
+    }
+  }
+
+  function snapshot() {
+    return { tiers: clone(state.tiers), order: [...state.order], diffOnly: state.diffOnly };
+  }
+
+  function resetToDefaults() {
+    state.tiers = clone(DEFAULT_TIERS);
+    state.order = [...DEFAULT_ORDER];
+    state.activePreset = null;
+    customProvider.clear();
+    customModel.clear();
+    render();
+    toast("已恢复默认 profile");
+  }
+
+  document.getElementById("tierList").addEventListener("click", (event) => {
+    const summary = event.target.closest("details[data-opts] > summary");
+    if (summary) {
+      const details = summary.parentElement;
+      openOpts[details.open ? "delete" : "add"](details.dataset.opts);
+      return;
+    }
+    const target = event.target.closest("[data-act]");
+    if (!target) return;
+    const card = target.closest("[data-tier]");
+    if (!card) return;
+    const key = card.dataset.tier;
+    const tier = state.tiers[key];
+    if (!tier) return;
+    const action = target.dataset.act;
+
+    if (action === "mode") {
+      tier.mode = target.dataset.mode;
+      if (tier.mode === "target") ensureTarget(key);
+      if (tier.mode === "same" && (!tier.ref || tier.ref === key)) {
+        tier.ref = state.order.find((item) => item !== key && state.tiers[item]?.mode !== "parent") || "";
+        if (tier.ref) {
+          const base = resolveBase(state.tiers[tier.ref]);
+          const primary = base ? primaryOptionFor(base) : null;
+          if (primary && tier.options?.[primary.id] == null) setOption(tier, primary.id, "low");
+        }
+      }
+      markEdited();
+      render();
+      return;
+    }
+
+    if (action === "alias") {
+      applyAlias(key, target.dataset.alias);
+      return;
+    }
+
+    if (action === "remove") {
+      if (pendingDelete !== key) {
+        pendingDelete = key;
+        clearTimeout(deleteTimer);
+        deleteTimer = setTimeout(() => {
+          pendingDelete = null;
+          render();
+        }, 2600);
+        render();
+        return;
+      }
+      clearTimeout(deleteTimer);
+      pendingDelete = null;
+      delete state.tiers[key];
+      state.order = state.order.filter((item) => item !== key);
+      for (const other of Object.values(state.tiers)) {
+        if (other.mode === "same" && other.ref === key) other.ref = "";
+      }
+      markEdited();
+      render();
+      toast(`已删除 tier ${key}`);
+    }
+  });
+
+  document.getElementById("tierList").addEventListener("change", (event) => {
+    const field = event.target.closest("[data-field]");
+    if (!field) return;
+    const card = field.closest("[data-tier]");
+    if (!card) return;
+    const key = card.dataset.tier;
+    const tier = state.tiers[key];
+    if (!tier) return;
+    const name = field.dataset.field;
+    const value = field.value;
+
+    if (name === "providerText" || name === "modelText" || name === "optionsText") {
+      persist();
+      return;
+    }
+
+    if (name === "provider") {
+      if (value === "__custom__") {
+        customProvider.add(key);
+        render();
+        focusField(key, "providerText");
+        return;
+      }
+      customProvider.delete(key);
+      tier.provider = value;
+      const provider = providerById(value);
+      if (provider && !modelById(provider, tier.model)) {
+        const sameModel = (provider.models || []).find((model) => model.id === tier.model);
+        tier.model = sameModel?.id || provider.models?.[0]?.id || "";
+        customModel.delete(key);
+        pruneOptions(tier);
+      }
+    } else if (name === "model") {
+      if (value === "__custom__") {
+        customModel.add(key);
+        render();
+        focusField(key, "modelText");
+        return;
+      }
+      customModel.delete(key);
+      tier.model = value;
+      pruneOptions(tier);
+    } else if (name === "effort") {
+      const primary = primaryOptionFor(tier);
+      if (primary) setOption(tier, primary.id, value);
+    } else if (name === "extra") {
+      setOption(tier, field.dataset.opt, value);
+    } else if (name === "ref") {
+      tier.ref = value;
+      const base = resolveBase(tier);
+      const primary = base ? primaryOptionFor(base) : null;
+      if (primary) {
+        const current = tier.options?.[primary.id];
+        if (current && !(primary.values || []).map(String).includes(String(current))) {
+          delete tier.options[primary.id];
+        }
+      }
+    } else if (name === "refEffort") {
+      const base = resolveBase(tier);
+      const primary = base ? primaryOptionFor(base) : null;
+      if (primary) setOption(tier, primary.id, value);
+    } else if (name === "role") {
+      tier.role = value;
+    } else if (name === "name") {
+      const next = value.trim();
+      if (!/^[a-z][a-z0-9_-]*$/.test(next)) {
+        toast("tier 名需为小写字母开头，可含数字、_、-");
+        render();
+        return;
+      }
+      if (next !== key && state.tiers[next]) {
+        toast(`tier ${next} 已存在`);
+        render();
+        return;
+      }
+      if (next !== key) {
+        state.tiers[next] = tier;
+        delete state.tiers[key];
+        state.order = state.order.map((item) => item === key ? next : item);
+        for (const other of Object.values(state.tiers)) {
+          if (other.mode === "same" && other.ref === key) other.ref = next;
+        }
+      }
+    }
+
+    markEdited();
+    render();
+  });
+
+  document.getElementById("tierList").addEventListener("input", (event) => {
+    const field = event.target.closest("[data-field]");
+    if (!field) return;
+    const card = field.closest("[data-tier]");
+    if (!card) return;
+    const tier = state.tiers[card.dataset.tier];
+    if (!tier) return;
+    const name = field.dataset.field;
+    if (name !== "providerText" && name !== "modelText" && name !== "optionsText") return;
+    if (name === "providerText") tier.provider = field.value.trim();
+    else if (name === "modelText") tier.model = field.value.trim();
+    else tier.options = parseOptionsText(field.value);
+    markEdited();
+    renderYaml();
+    renderIssues();
+    persist();
+  });
+
+  document.getElementById("tierList").addEventListener("toggle", (event) => {
+    const details = event.target.closest("details[data-opts]");
+    if (!details) return;
+    const key = details.dataset.opts;
+    if (details.open) openOpts.add(key);
+    else openOpts.delete(key);
+  }, true);
+
+  document.getElementById("addTier").addEventListener("click", () => {
+    let index = 1;
+    let name = "custom";
+    while (state.tiers[name]) name = "custom" + (++index);
+    const provider = catalog().find(providerEligible) || catalog()[0];
+    state.tiers[name] = {
+      mode: "target",
+      provider: provider?.id || "codex",
+      model: provider?.models?.[0]?.id || "gpt-6.1-sol",
+      role: "implementation",
+      options: {}
+    };
+    state.order.push(name);
+    markEdited();
+    render();
+    const input = document.querySelector(`[data-tier="${CSS.escape(name)}"] [data-field="name"]`);
+    if (input) { input.focus(); input.select(); }
+  });
+
+  document.getElementById("diffOnly").addEventListener("change", (event) => {
+    state.diffOnly = event.target.checked;
+    markEdited();
+    renderYaml();
+    persist();
+  });
+
+  document.getElementById("copyYaml").addEventListener("click", () => {
+    copyText(document.getElementById("yamlOut").dataset.raw || "", "YAML ");
+  });
+
+  document.getElementById("copyMessage").addEventListener("click", () => {
+    const yaml = document.getElementById("yamlOut").dataset.raw || "";
+    const message = "$t3-orca 逐项开发\n\n```yaml\n" + yaml + "\n```\n";
+    copyText(message, "消息");
+  });
+
+  document.getElementById("download").addEventListener("click", () => {
+    const yaml = document.getElementById("yamlOut").dataset.raw || "";
+    const blob = new Blob([yaml + "\n"], { type: "text/yaml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "tiers.yaml";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast("tiers.yaml 已下载");
+  });
+
+  document.getElementById("openCaps").addEventListener("click", () => {
+    const panel = document.getElementById("capsPanel");
+    panel.open = true;
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("capsInput").focus();
+  });
+
+  document.getElementById("loadCaps").addEventListener("click", () => {
+    const input = document.getElementById("capsInput");
+    applyCapsText(input.value);
+  });
+
+  document.getElementById("chooseCapsFile").addEventListener("click", () => {
+    document.getElementById("capsFile").click();
+  });
+
+  document.getElementById("capsFile").addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      document.getElementById("capsInput").value = text;
+      applyCapsText(text);
+    } catch (error) {
+      toast("读取文件失败：" + error.message);
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  document.getElementById("clearCaps").addEventListener("click", () => {
+    state.caps = null;
+    document.getElementById("capsInput").value = "";
+    render();
+    toast("已切回内置预填目录");
+  });
+
+  document.getElementById("savePresetBtn").addEventListener("click", () => {
+    const row = document.getElementById("saveRow");
+    row.hidden = false;
+    const input = document.getElementById("presetName");
+    input.value = state.activePreset || "";
+    input.focus();
+    input.select();
+  });
+
+  document.getElementById("cancelSave").addEventListener("click", () => {
+    document.getElementById("saveRow").hidden = true;
+  });
+
+  document.getElementById("confirmSave").addEventListener("click", () => {
+    const input = document.getElementById("presetName");
+    const name = input.value.trim();
+    if (!name) { toast("请填预设名"); input.focus(); return; }
+    state.presets[name] = snapshot();
+    state.activePreset = name;
+    document.getElementById("saveRow").hidden = true;
+    render();
+    toast(`已保存预设「${name}」`);
+  });
+
+  document.getElementById("presetSelect").addEventListener("change", (event) => {
+    const value = event.target.value;
+    if (value === "__current") {
+      state.activePreset = null;
+      render();
+      return;
+    }
+    const preset = state.presets[value];
+    if (!preset) return;
+    state.tiers = clone(preset.tiers);
+    state.order = [...preset.order];
+    state.diffOnly = Boolean(preset.diffOnly);
+    state.activePreset = value;
+    customProvider.clear();
+    customModel.clear();
+    document.getElementById("diffOnly").checked = state.diffOnly;
+    render();
+    toast(`已载入预设「${value}」`);
+  });
+
+  document.getElementById("deletePresetBtn").addEventListener("click", () => {
+    const name = state.activePreset;
+    if (!name || !state.presets[name]) return;
+    delete state.presets[name];
+    state.activePreset = null;
+    render();
+    toast(`已删除预设「${name}」`);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
+
+  document.getElementById("presetName").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      document.getElementById("confirmSave").click();
+    } else if (event.key === "Escape") {
+      document.getElementById("saveRow").hidden = true;
+    }
+  });
+
+  document.getElementById("diffOnly").checked = state.diffOnly;
+  render();
+
+  document.getElementById("yamlOut").addEventListener("click", () => {
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById("yamlOut"));
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+})();
+</script>
+</body>
+</html>

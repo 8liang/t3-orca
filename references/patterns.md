@@ -2,6 +2,8 @@
 
 Patterns for capability-routed T3 child agents. Adapt them; do not run every pattern in every task.
 
+The default patterns below use an independent review delegate. The `tiered-delivery` preset is an explicit exception: the parent reviews and fixes go back to the original child thread. Use [tiered-delivery.md](tiered-delivery.md) for that workflow instead of mixing it with the independent-review pattern.
+
 ## Brief template
 
 The child has no parent history. A good brief is self-contained and verifiable.
@@ -126,6 +128,8 @@ Use when correctness matters and a second provider adds real independence.
 ```
 
 Use `mode: "wait"` only when you need the review before your next action. Otherwise use async and end the turn.
+
+For the parent-review and original-thread-fix variant, use the `tiered-delivery` preset in [tiered-delivery.md](tiered-delivery.md).
 
 ## Pattern: parallel worktrees
 
