@@ -1,0 +1,4 @@
+interface:
+  display_name: "T3 ORCA"
+  short_description: "Route sub-agents to capability-matched provider-models"
+  default_prompt: "Use $t3-orca to plan this work and delegate it to capability-matched sub-agents."
