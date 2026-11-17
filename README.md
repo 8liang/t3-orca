@@ -60,14 +60,21 @@ Tier Profile 窗口，也可以随时说 `打开 tier 窗口` 重新打开：
 
 [assets/tier-profile.html](assets/tier-profile.html)
 
-窗口是单文件、离线可用的 HTML，T3 Code 里由 `html_preview` / `html_render` 直接渲染，也可以双击用浏览器打开。功能：
+窗口由模板生成，T3 Code 里由 `html_preview` / `html_render` 直接渲染，也可以双击用浏览器打开。生成时会自动注入 `orchestrator_capabilities` 的 live 目录，所以 provider / model 下拉直接来自当前 T3 Code 环境，不需要手动粘贴。功能：
 
 - 四个默认 tier（`ui`、`code`、`fast`、`review`），可增删、改名、改 role。
 - 每个 tier 可选：指定模型、复用另一个 tier、父线程 Review、继承父线程。
 - provider / model / 强度下拉；支持 `sol6.1`、`deepseek-flash-claude`、`opus` 等别名一键填充。
-- 可选导入 `orchestrator_capabilities` 的 JSON，按 live 目录校验 provider、model 和选项值。
+- 自动载入 T3 Code live capabilities，并按 live 目录校验 provider、model 和选项值；右上角显示 `T3 Code · N providers`。
+- 需要手动覆盖时，可在窗口内粘贴 JSON 或选择 capabilities 文件。
 - 实时生成可复制的 `tiers:` 块；`仅输出改动` 模式只写与默认不同的 tier。
 - 保存常用预设（浏览器 localStorage），下次打开自动恢复上次编辑。
+
+打开流程：Skill 先调用 `orchestrator_capabilities`，把结果写入临时 JSON，运行
+`node scripts/build-tier-profile.mjs <capabilities.json> <out.html>`，再预览生成的 HTML。
+如果窗口右上角显示 `内置预填目录` 而不是 `T3 Code · N providers`，说明注入失败，可在
+Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用时，直接打开原始模板。
+说 `刷新 tier 窗口` 时会重新调用 `orchestrator_capabilities` 并重建窗口。
 
 返回方式二选一：
 
@@ -165,6 +172,8 @@ t3-orca/
 |-- assets/
 |   |-- tier-profile.html
 |   `-- tier-profile.template.yaml
+|-- scripts/
+|   `-- build-tier-profile.mjs
 |-- references/
 |   |-- orchestrator-v2.md
 |   |-- routing.md
@@ -182,4 +191,5 @@ t3-orca/
 - `references/tiered-delivery.md`：逐项开发预设的 tier 解析、Review 循环、5 轮上限和逐项提交规则。
 - `references/review-loop.md`：只读 Review 循环预设的 reviewer 解析、read-only 契约、父线程修复验证、triage、5 轮上限和阻塞报告。
 - `references/tier-profile.md`：Tier Profile 窗口、每次会话的 `tiers:` 覆盖、配置优先级和校验规则。
+- `scripts/build-tier-profile.mjs`：把 `orchestrator_capabilities` 注入 Tier Profile 窗口，生成临时 HTML。
 - `references/patterns.md`：fan-out、pipeline、review loop、worktree、escalation 和 brief 模板。

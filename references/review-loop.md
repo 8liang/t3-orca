@@ -57,7 +57,7 @@ tiers:
 
 `review: parent` is a `tiered-delivery` value. Here it means the profile did not name a reviewer, so use the preset default. This preset always needs an independent reviewer.
 
-If no profile exists, do not open the Tier Profile window just for the review unless the user asks; use the explicit target or the preset default. If the user asks to configure tiers, resolve and validate it exactly as the development flow does.
+If no profile exists, do not open the Tier Profile window just for the review unless the user asks; use the explicit target or the preset default. If the user asks to configure tiers, resolve and validate it exactly as the development flow does, including the live-capabilities injection in the Tier Profile window.
 
 `ui`, `code`, and `fast` do not affect the reviewer. Use the effort configured on the `review` tier; do not override a concrete profile target with the preset default.
 

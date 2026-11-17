@@ -68,14 +68,16 @@ The short form above is the default profile. Tiers change between sessions, so r
 3. `~/.config/t3-orca/tiers.yaml`;
 4. otherwise open the Tier Profile window once.
 
-The window is [assets/tier-profile.html](assets/tier-profile.html). It is a self-contained, offline configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, optional live-capabilities validation, saved presets, and a generated `tiers:` block.
+The window is built from [assets/tier-profile.html](assets/tier-profile.html) by [scripts/build-tier-profile.mjs](scripts/build-tier-profile.mjs). It is a self-contained, offline configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, live-catalog validation, saved presets, and a generated `tiers:` block.
 
 Show it in T3 Code:
 
-- Call `html_preview` with the absolute path to `assets/tier-profile.html` and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and the returned `contentHeight` as `height` (cap 2000). Do not inline the HTML.
-- Say one line: edit the tiers in the window, then copy the generated YAML back (or save it to `.t3-orca/tiers.yaml`).
-- If those tools are unavailable, or the user says the frame is not interactive, give them the absolute file path to open in a browser.
-- When they return the YAML, validate every target against `orchestrator_capabilities`, restate it once in compact form, and use it for the thread. Do not ask again per item.
+1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file, for example `/tmp/t3-orca-capabilities.json`.
+2. Resolve `<skill-dir>` to the directory containing this `SKILL.md`, then run `node <skill-dir>/scripts/build-tier-profile.mjs /tmp/t3-orca-capabilities.json /tmp/t3-orca-tier-profile.html`. It prints the generated absolute path and injects the live catalog, so the window lists T3 Code's real providers and models instead of the seed catalog.
+3. Call `html_preview` with that path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and the returned `contentHeight` as `height` (cap 2000). Do not inline the HTML.
+4. Say one line: edit the tiers in the window, then copy the generated YAML back (or save it to `.t3-orca/tiers.yaml`). The `Capabilities` panel remains available for a manual override. If the user asks to refresh the catalog, call `orchestrator_capabilities` again, rebuild to the same path, and re-render.
+5. If `orchestrator_capabilities` or Node is unavailable, open the raw `assets/tier-profile.html` and use its manual `Capabilities` panel. If the preview tools are unavailable, or the user says the frame is not interactive, give them the absolute file path to open in a browser.
+6. When they return the YAML, validate every target against `orchestrator_capabilities`, restate it once in compact form, and use it for the thread. Do not ask again per item.
 
 Chat fallback when no window is available:
 

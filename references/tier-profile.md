@@ -118,7 +118,7 @@ Compact and expanded forms can be mixed.
 
 ## Tier Profile window
 
-[assets/tier-profile.html](../assets/tier-profile.html) is a self-contained configurator for the profile. It works from `file://` and inside the T3 Code preview panel; no network, build, or dependencies.
+[assets/tier-profile.html](../assets/tier-profile.html) is the template for a self-contained configurator. [scripts/build-tier-profile.mjs](../scripts/build-tier-profile.mjs) injects the live catalog and writes a temporary copy; the generated page still works from `file://` and inside the T3 Code preview panel with no network or dependencies.
 
 What it does:
 
@@ -126,7 +126,7 @@ What it does:
 - picks `providerInstanceId`, model `id`, role, and every advertised option;
 - supports `parent`, `inherit`, and reuse-another-tier (`fast: code @ low`) modes;
 - applies friendly aliases;
-- optionally validates against a pasted `orchestrator_capabilities` JSON;
+- loads the live `orchestrator_capabilities` catalog injected at build time;
 - emits the compact or expanded `tiers:` block;
 - keeps named presets and the last edit in `localStorage`.
 
@@ -134,15 +134,19 @@ What it does:
 
 When a thread has no usable profile, open the window once:
 
-1. Call `html_preview` with the absolute path to `assets/tier-profile.html` and `width: 1180`.
-2. Call `html_render` with the same `path`, `title: "Tier Profile"`, and the `contentHeight` returned by `html_preview` as `height` (cap 2000).
-3. Send one short line: edit the tiers, then copy the generated YAML back or save it to `.t3-orca/tiers.yaml`.
+1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file.
+2. Run `node scripts/build-tier-profile.mjs <capabilities.json> <out.html>` from the skill directory. It injects the result as `window.__T3_ORCA_CAPABILITIES__` and prints the generated path.
+3. Call `html_preview` with that path and `width: 1180`.
+4. Call `html_render` with the same `path`, `title: "Tier Profile"`, and the `contentHeight` returned by `html_preview` as `height` (cap 2000).
+5. Send one short line: edit the tiers, then copy the generated YAML back or save it to `.t3-orca/tiers.yaml`.
 
 Do not paste the HTML source into the thread. Do not also dump a long provider/model table.
 
-If `html_preview` or `html_render` is unavailable, or the embedded frame is not interactive, give the user the absolute path and ask them to open it in a browser. The page works the same way.
+The injected catalog is live. The page badge shows `T3 Code · N providers` when injection succeeded. If it shows `内置预填目录`, injection failed or the raw template was opened; use the Capabilities panel to paste the JSON manually, or rerun the helper.
 
-The built-in catalog is only a prefill. If the user needs strict validation, ask them to paste their `orchestrator_capabilities` JSON into the window's Capabilities panel, or to choose a saved `capabilities.json`. Never present the seed catalog as live truth.
+If `orchestrator_capabilities` or Node is unavailable, open the raw `assets/tier-profile.html` and use the manual Capabilities panel. If `html_preview` or `html_render` is unavailable, or the embedded frame is not interactive, give the user the absolute path and ask them to open it in a browser. The page works the same way.
+
+Never present the seed catalog as live truth.
 
 ### Chat fallback
 

@@ -682,11 +682,11 @@
     <div class="mark">ORCA</div>
     <div>
       <h1>Tier Profile</h1>
-      <p>为本次 <strong>逐项开发</strong> 指定 tier → provider / model / 强度</p>
+      <p>为本次 <strong>逐项开发 / review 循环</strong> 指定 tier → provider / model / 强度</p>
     </div>
     <div class="top-actions">
       <span class="badge" id="capsBadge"><span class="dot"></span><span id="capsBadgeText">内置预填目录</span></span>
-      <button type="button" class="btn" id="openCaps">导入 capabilities</button>
+      <button type="button" class="btn" id="openCaps">Capabilities</button>
     </div>
   </header>
 
@@ -715,8 +715,8 @@
         <summary>Capabilities · 校验 provider / model / 选项</summary>
         <div class="caps-body">
           <p class="caps-hint">
-            粘贴 <code>orchestrator_capabilities</code> 的 JSON 结果，下拉框和校验会按 live 目录更新。
-            不导入也能用，但提交后仍会按 live capabilities 校验。
+            T3 Code 打开窗口时会自动注入 live capabilities；下拉框和校验直接使用当前环境的 provider / model。
+            也可以在这里粘贴 JSON 或选择文件手动覆盖。
           </p>
           <textarea id="capsInput" spellcheck="false" placeholder='{"providers":[{"providerInstanceId":"codex","models":[{"id":"gpt-6.1-sol","options":[{"id":"reasoningEffort","values":["low","medium","high"]}]}]}]}'></textarea>
           <div class="caps-actions">
@@ -873,6 +873,7 @@
   }
 
   let state = loadState();
+  applyInjectedCaps();
   const storageAvailable = (() => {
     try {
       const probe = STORAGE_KEY + ".probe";
@@ -895,6 +896,8 @@
       order: [...DEFAULT_ORDER],
       diffOnly: false,
       caps: null,
+      capsSource: null,
+      capsError: null,
       presets: {},
       activePreset: null
     };
@@ -924,6 +927,8 @@
         order,
         diffOnly: Boolean(saved.diffOnly),
         caps: null,
+        capsSource: null,
+        capsError: null,
         presets: sanitizePresets(saved.presets),
         activePreset: typeof saved.activePreset === "string" ? saved.activePreset : null
       };
@@ -1298,7 +1303,7 @@
       `;
     } else if (tier.mode === "parent") {
       body = `<p class="note">${isReview
-        ? "父线程自己 Review，不委派。发现的问题用 <b>t3_thread_send</b> 回原 child thread 修复。"
+        ? "逐项开发：父线程自己 Review，不委派；发现问题用 <b>t3_thread_send</b> 回原 child thread 修复。review 循环：<b>parent</b> 视为未设置，使用默认 reviewer（sol6.1 low）。"
         : "父线程不是模型 tier；只有 <b>review</b> 适合设为父线程，其他 tier 请选模型。"}</p>`;
     } else {
       body = `<p class="note">子 agent 继承父线程的 provider、model 和 options。适合临时兜底，不记录具体目标。</p>`;
@@ -1376,11 +1381,16 @@
       issues.push({ level, text });
     };
 
+    if (state.capsError) {
+      add("error", `注入的 T3 Code capabilities 无效：${state.capsError}`);
+    }
+
     if (!state.caps) {
-      add("info", "当前使用内置预填目录；提交后仍会按 live capabilities 校验，不可用会报告替换。");
+      add("info", "当前使用内置预填目录；在 T3 Code 中打开窗口会自动注入 live capabilities，提交后仍会按 live 目录校验。");
     } else {
       const omitted = state.caps.providers.reduce((sum, provider) => sum + (provider.omittedModels || 0), 0);
-      add("ok", `已载入 ${state.caps.providers.length} 个 provider · ${state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0)} 个 model${omitted ? `（另有 ${omitted} 个未列出，必要时用 search）` : ""}。`);
+      const source = state.capsSource === "t3" ? "T3 Code 自动载入" : "已载入";
+      add("ok", `${source} ${state.caps.providers.length} 个 provider · ${state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0)} 个 model${omitted ? `（另有 ${omitted} 个未列出，必要时用 search）` : ""}。`);
     }
 
     for (const key of state.order) {
@@ -1461,12 +1471,14 @@
     if (state.caps) {
       badge.classList.add("live");
       const count = state.caps.providers.length;
-      text.textContent = `live · ${count} provider${count === 1 ? "" : "s"}`;
-      status.textContent = `已载入 live capabilities：${count} 个 provider，${state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0)} 个 model。`;
+      const models = state.caps.providers.reduce((sum, provider) => sum + (provider.models || []).length, 0);
+      const fromT3 = state.capsSource === "t3";
+      text.textContent = `${fromT3 ? "T3 Code" : "live"} · ${count} provider${count === 1 ? "" : "s"}`;
+      status.textContent = `${fromT3 ? "已从 T3 Code 自动载入" : "已手动导入"} live capabilities：${count} 个 provider，${models} 个 model。`;
     } else {
       badge.classList.remove("live");
       text.textContent = "内置预填目录";
-      status.textContent = "尚未导入 live capabilities。";
+      status.textContent = state.capsError ? `注入失败：${state.capsError}` : "尚未载入 live capabilities。";
     }
   }
 
@@ -1659,10 +1671,26 @@
     };
   }
 
+  function applyInjectedCaps() {
+    let payload = window.__T3_ORCA_CAPABILITIES__;
+    if (!payload) return;
+    try {
+      if (typeof payload === "string") payload = JSON.parse(payload);
+      state.caps = normalizeCaps(payload);
+      state.capsSource = "t3";
+      state.capsError = null;
+    } catch (error) {
+      state.capsError = error.message;
+      console.warn("T3 ORCA: invalid injected capabilities", error);
+    }
+  }
+
   function applyCapsText(text) {
     try {
       const parsed = JSON.parse(text);
       state.caps = normalizeCaps(parsed);
+      state.capsSource = "manual";
+      state.capsError = null;
       document.getElementById("capsPanel").open = false;
       render();
       toast(`已载入 ${state.caps.providers.length} 个 provider`);
@@ -1943,6 +1971,8 @@
 
   document.getElementById("clearCaps").addEventListener("click", () => {
     state.caps = null;
+    state.capsSource = null;
+    state.capsError = null;
     document.getElementById("capsInput").value = "";
     render();
     toast("已切回内置预填目录");
