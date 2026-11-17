@@ -1494,6 +1494,10 @@
   }
 
   function render(options) {
+    // Reconcile restored drafts, provider changes, and dependent reuse tiers.
+    for (const tier of Object.values(state.tiers)) {
+      if (tier.mode === "target" || tier.mode === "same") pruneOptions(tier);
+    }
     const opts = options || {};
     if (opts.cards !== false) renderCards();
     renderYaml();
@@ -1593,11 +1597,14 @@
   }
 
   function pruneOptions(tier) {
-    const model = modelById(providerById(tier.provider), tier.model);
-    if (!model) return;
-    const valid = new Set((model.options || []).map((option) => option.id));
-    for (const optionId of Object.keys(tier.options || {})) {
-      if (!valid.has(optionId)) delete tier.options[optionId];
+    const base = resolveBase(tier);
+    const model = base && modelById(providerById(base.provider), base.model);
+    if (!model) return; // Preserve options for unknown custom targets.
+    for (const [optionId, value] of Object.entries(tier.options || {})) {
+      const option = (model.options || []).find((item) => item.id === optionId);
+      if (!option || !(option.values || []).some((allowed) => String(allowed) === String(value))) {
+        delete tier.options[optionId];
+      }
     }
   }
 
