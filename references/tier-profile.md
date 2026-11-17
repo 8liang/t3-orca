@@ -33,7 +33,8 @@ Rules:
 - `same_as` shorthand: `fast: code @ effort=low` reuses the `code` provider/model and overrides options.
 - `same_as` resolves the referenced tier after all overlays, so `fast: code @ effort=low` follows a changed `code` target.
 - `inherit` uses the parent thread's provider, model, and options.
-- `review: parent` is the preset default. A target such as `review: claudeAgent:claude-opus-5-5 @ effort=high` switches to an independent review delegate.
+- `review: parent` is the `tiered-delivery` default. A target such as `review: claudeAgent:claude-opus-5-5 @ effort=high` switches to an independent review delegate.
+- The `review-loop` preset always needs an independent reviewer and reads the same profile: a concrete `review` target is used; `review: parent` means unset there, so that preset's default `sol6.1 @ low` applies. There is no separate reviewer setting. See [review-loop.md](review-loop.md).
 - `default` resets that tier to the default profile.
 - Option values are coerced to the types advertised by the live capability payload (string, boolean, or number).
 
@@ -65,7 +66,7 @@ Current aliases (re-discover before relying on them):
 
 | Alias | Resolves to |
 |---|---|
-| `sol6.1` | `codex:gpt-6.1-sol` |
+| `sol6.1`, `sol-6.1` | `codex:gpt-6.1-sol` |
 | `deepseek-flash-claude` | `magpie:dumate/deepseek-v41-flash[1m]` |
 | `deepseek-flash` | same as above; prefer `magpie` |
 | `opus` | `claude-opus-5-5`; prefer `claudeAgent` |

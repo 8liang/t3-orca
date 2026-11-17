@@ -4,6 +4,8 @@ T3 Code 的 **Orchestrator V2 能力路由 skill**。它把任务拆成子任务
 
 ORCA = **Orchestrator Routing & Capability Assignment**。
 
+内置两个预设：`逐项开发`（父线程 Review + 逐项提交）和 `review 循环`（独立只读 reviewer + 父线程修复）。
+
 ## 解决什么问题
 
 - 同一个任务里，不同子任务需要不同能力：实现、研究、审查、测试、设计。
@@ -96,6 +98,8 @@ tiers:
 
 以上是当前环境的默认目标；实际执行时仍会先读 `orchestrator_capabilities` 校验，ID 变化则按 `driverKind`/label 匹配并报告 substitution。
 
+`review 循环` 预设的 reviewer 复用 `逐项开发` 的同一份 tier profile，读取其中的 `review` tier；不额外维护 reviewer 配置。profile 里指定了具体模型时使用该目标；值为 `parent` 时视为未设置，使用该预设默认的 `sol6.1 @ low`。
+
 要调整默认 tier 映射，改 `references/tiered-delivery.md` 的 Tier table 即可；skill 仍会在运行时校验目标是否可用。
 
 预设流程：
@@ -107,6 +111,42 @@ tiers:
 - 默认父线程只发增量 findings，不重复整份 brief；不额外启动 review/test agent，减少 token。
 - 目标从 `orchestrator_capabilities` 实时解析；不可用时报告 substitution，不静默换模型。
 
+## 只读 Review 循环预设
+
+当你说 `review 循环`、`review-loop`、`只读 Review 循环`，或者提出下面这类需求时，skill 套用这个预设：
+
+> 派 sol-6.1 low 子代理只读 Review，你负责修复问题并验证，再次 Review，循环直到无实质性问题。忽略误报和纯风格建议，最多 5 轮，未通过则汇报阻塞原因。
+
+等价于在 tier profile 里设置：
+
+```yaml
+tiers:
+  review: sol6.1 @ low
+```
+
+`review 循环` 每轮都用这个 reviewer；profile 没设 `review` 时使用预设默认。
+
+```text
+$t3-orca review 循环 <scope>
+```
+
+流程：
+
+1. 父线程先实现（如果改动还不存在），并跑一遍测试 / 构建确认基线。
+2. 每轮新起一个只读 review 子代理，目标来自和 `逐项开发` 同一份 tier profile 的 `review` tier，解析顺序也相同（inline `tiers:` > 项目 `.t3-orca/tiers.yaml` > 全局配置 > 预设默认）。review 循环的预设默认是 `sol6.1 @ low`（`codex` / `gpt-6.1-sol`，`reasoningEffort: low`）。Brief 包含 repo 路径、base SHA、diff 命令、验收标准、测试结果和上一轮 findings。
+3. 父线程 triage：实质问题自己修复并验证；误报用代码证据驳回；纯风格建议忽略，不改代码、不占轮次。
+4. 修复后重跑测试，再新起一轮 review。不复用上一轮 reviewer，也不把修复交给 reviewer。
+5. 某一轮没有实质问题且验证通过即完成。第 5 轮仍有实质问题就停下，汇报阻塞原因，不提交。
+6. 只有你明确要求时才 commit；任何时候都不 push。
+
+要点：
+
+- reviewer 只读：不改文件、不 stage/commit/push、不跑有状态命令、不起子代理；父线程负责修复和验证。
+- reviewer 用 `isolation: "shared"`，必须看到父线程未提交的修复；`worktree` 会漏掉这些改动。
+- reviewer 目标就是 tier profile 的 `review` tier，和 `逐项开发` 用同一套解析；优先级：当前消息显式指定 > profile 的 `review` > 预设默认 `sol6.1 @ low`。`review: parent` 是逐项开发的值，在 review 循环里视为未设置，绝不改成父线程自审。
+- 5 轮未通过时报告：未解决的 findings、每轮做了什么、为什么卡住、下一步选项；不静默加轮次。
+- reviewer 目标不可用时报告 substitution，不静默换模型。
+
 ## 设计原则
 
 - **运行时发现**：不在 skill 里写死 model ID，所有目标来自 `orchestrator_capabilities`。
@@ -114,7 +154,7 @@ tiers:
 - **子任务自包含**：子 agent 没有父线程历史，brief 必须包含目标、上下文、约束、交付物和验证方式。
 - **异步不轮询**：异步子任务完成后会唤醒父线程；启动后结束当前回合，不 sleep、不轮询。
 - **显式失败**：provider/model 不可用就报告，不静默降级到 native subagent、workflow 或 CLI。
-- **审查隔离**：默认 review/re-check 新建 `delegate_task`，高风险审查尽量换 provider 或模型家族；`逐项开发` 预设默认由父线程自审并回原 Thread 修复，也可在 tier profile 指定 review delegate。
+- **审查隔离**：默认 review/re-check 新建 `delegate_task`，高风险审查尽量换 provider 或模型家族；`逐项开发` 默认父线程自审并回原 Thread 修复，也可在 tier profile 指定 review delegate；`review 循环` 始终用独立只读 reviewer，父线程负责修复和验证，每轮新建 reviewer。
 
 ## 结构
 
@@ -129,6 +169,7 @@ t3-orca/
 |   |-- orchestrator-v2.md
 |   |-- routing.md
 |   |-- tiered-delivery.md
+|   |-- review-loop.md
 |   |-- tier-profile.md
 |   `-- patterns.md
 `-- README.md
@@ -139,5 +180,6 @@ t3-orca/
 - `references/orchestrator-v2.md`：Orchestrator V2 工具契约与字段语义。
 - `references/routing.md`：能力信号、候选评分和路由示例。
 - `references/tiered-delivery.md`：逐项开发预设的 tier 解析、Review 循环、5 轮上限和逐项提交规则。
+- `references/review-loop.md`：只读 Review 循环预设的 reviewer 解析、read-only 契约、父线程修复验证、triage、5 轮上限和阻塞报告。
 - `references/tier-profile.md`：Tier Profile 窗口、每次会话的 `tiers:` 覆盖、配置优先级和校验规则。
 - `references/patterns.md`：fan-out、pipeline、review loop、worktree、escalation 和 brief 模板。

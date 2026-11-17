@@ -6,6 +6,8 @@
 #
 # Modes: a model target, `same tier` reuse, `parent`, or `inherit`.
 # Only the tiers that differ need to be present; the rest use the default table.
+# `review: parent` applies to 逐项开发. In review 循环 a concrete review target
+# is the reviewer, and `parent` falls back to that preset's sol6.1 @ low.
 
 tiers:
   ui: sol6.1 @ high

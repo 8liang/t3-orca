@@ -774,7 +774,7 @@
     ui: { use: "UI / 设计 / 视觉", short: "UI" },
     code: { use: "纯代码 / 重构 / bugfix", short: "代码" },
     fast: { use: "机械修改 / 小测试改动", short: "快速" },
-    review: { use: "每个 item 的 Review", short: "审查" }
+    review: { use: "逐项 Review / review 循环 reviewer", short: "审查" }
   };
   const MODE_LABEL = { target: "模型", same: "复用", parent: "父线程", inherit: "继承" };
 
@@ -1341,7 +1341,7 @@
   function aliasesFor(key) {
     if (key === "ui" || key === "design") return ALIASES.filter((alias) => alias.name === "sol6.1" || alias.name === "opus");
     if (key === "code" || key === "fast") return ALIASES.filter((alias) => alias.name.includes("deepseek") || alias.name === "sol6.1");
-    if (key === "review") return ALIASES.filter((alias) => ["opus", "sonnet"].includes(alias.name));
+    if (key === "review") return ALIASES.filter((alias) => ["sol6.1", "opus", "sonnet"].includes(alias.name));
     return ALIASES.filter((alias) => ["sol6.1", "opus", "gemini-flash"].includes(alias.name));
   }
 

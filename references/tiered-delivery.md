@@ -38,6 +38,8 @@ Profiles can use friendly aliases such as `ui: sol6.1 @ high` and `code: deepsee
 | `fast` | Mechanical edits, small test-only changes, low-risk cleanup | same as `code` | `effort: low` | Fast eligible code target; report the substitution. |
 | `review` | Review of every item | parent thread by default | none | If the profile names a review target, use a fresh `delegate_task` per review round; otherwise no delegate. |
 
+The `review` tier also supplies the reviewer target for the `review-loop` preset, which resolves the same profile; see [review-loop.md](review-loop.md).
+
 Tier is a routing profile, not a global quality ranking. `ui` is the high-capability visual/design tier; `code` is the standard code tier; `fast` is optional and is only for mechanical or explicitly token-sensitive work. Honor an explicit natural-language override such as "use max", "use fast", or "use default"; otherwise use the tier default.
 
 Classify each item by its dominant capability:
@@ -49,7 +51,7 @@ Classify each item by its dominant capability:
 
 ### Alias rules
 
-- `sol6.1`, `sol 6.1`, and `Sol 6.1` resolve to `gpt-6.1-sol`. Do not resolve them to `gpt-6.1-terra` or another model merely because it contains `6.1`.
+- `sol6.1`, `sol-6.1`, `sol 6.1`, and `Sol 6.1` resolve to `gpt-6.1-sol`. Do not resolve them to `gpt-6.1-terra` or another model merely because it contains `6.1`.
 - `magpie DeepSeek-Flash (claude)` resolves to provider `magpie` with `driverKind: claudeAgent` and model `dumate/deepseek-v41-flash[1m]`.
 - `magpie-codex` with `dumate/deepseek-v41-flash` is a different driver. Do not use it silently for the Claude tier. If it is used as a fallback, report the driver change.
 - `DeepSeek-Flash` without a provider qualifier prefers `magpie` Claude, then a reported fallback.
