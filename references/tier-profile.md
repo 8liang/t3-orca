@@ -132,19 +132,19 @@ What it does:
 
 ### Opening it
 
-When a thread has no usable profile, open the window once:
+When a thread has no usable profile — or whenever the user explicitly asks to open/configure tiers (`/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, `刷新 tier 窗口`) — open the window directly. Explicit setup requests take precedence over presets, require no delegation prerequisite, and must not be suppressed by an existing `tiers.yaml`:
 
 1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file.
-2. Run `node scripts/build-tier-profile.mjs <capabilities.json> <out.html>` from the skill directory. It injects the result as `window.__T3_ORCA_CAPABILITIES__` and prints the generated path.
+2. Run `node <skill-dir>/scripts/build-tier-profile.mjs <capabilities.json> [out.html]` using the absolute script path from any working directory (omitting `out.html` writes to a safe unique temp file and prints its absolute path; target project files stay untouched). It injects the result as `window.__T3_ORCA_CAPABILITIES__` and prints the generated path.
 3. Call `html_preview` with that path and `width: 1180`.
-4. Call `html_render` with the same `path`, `title: "Tier Profile"`, and the `contentHeight` returned by `html_preview` as `height` (cap 2000).
-5. Send one short line: edit the tiers, then copy the generated YAML back or save it to `.t3-orca/tiers.yaml`.
+4. Call `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000).
+5. Send one short line: edit the tiers, then copy the generated YAML back or download it to save manually to `.t3-orca/tiers.yaml`. Do not overwrite any existing config file automatically, and do not claim the embedded iframe saves files to disk.
 
 Do not paste the HTML source into the thread. Do not also dump a long provider/model table.
 
 The injected catalog is live. The page badge shows `T3 Code · N providers` when injection succeeded. If it shows `内置预填目录`, injection failed or the raw template was opened; use the Capabilities panel to paste the JSON manually, or rerun the helper.
 
-If `orchestrator_capabilities` or Node is unavailable, open the raw `assets/tier-profile.html` and use the manual Capabilities panel. If `html_preview` or `html_render` is unavailable, or the embedded frame is not interactive, give the user the absolute path and ask them to open it in a browser. The page works the same way.
+If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use the manual Capabilities panel. If `html_preview` or `html_render` is unavailable, or the embedded frame is not interactive, give the user the absolute file path link and ask them to open it in a browser. The page works the same way.
 
 Never present the seed catalog as live truth.
 

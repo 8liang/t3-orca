@@ -56,7 +56,7 @@ $t3-orca 逐项开发 <需求>
 ### Tier Profile 窗口
 
 每次的模型 tier 不同，不用再手打 `provider:model:effort`。Skill 会在第一次需要时打开一个交互式
-Tier Profile 窗口，也可以随时说 `打开 tier 窗口` 重新打开：
+Tier Profile 窗口，也可以随时通过 `$t3-orca 配置`、`$t3-orca 设置`、`$t3-orca setup`（或当宿主将其路由到本 skill 时的 `/t3-orca 配置` / `/t3-orca 设置` / `/t3-orca setup`）以及 `打开 tier 窗口` 直接打开配置页，无需先触发委派或预设，也不会被已有的 `tiers.yaml` 拦截：
 
 [assets/tier-profile.html](assets/tier-profile.html)
 
@@ -68,12 +68,12 @@ Tier Profile 窗口，也可以随时说 `打开 tier 窗口` 重新打开：
 - 自动载入 T3 Code live capabilities，并按 live 目录校验 provider、model 和选项值；右上角显示 `T3 Code · N providers`。
 - 需要手动覆盖时，可在窗口内粘贴 JSON 或选择 capabilities 文件。
 - 实时生成可复制的 `tiers:` 块；`仅输出改动` 模式只写与默认不同的 tier。
-- 保存常用预设（浏览器 localStorage），下次打开自动恢复上次编辑。
+- 保存常用预设（浏览器 localStorage），下次打开自动恢复上次编辑（预览框本身不会写入本地磁盘文件）。
 
-打开流程：Skill 先调用 `orchestrator_capabilities`，把结果写入临时 JSON，运行
-`node scripts/build-tier-profile.mjs <capabilities.json> <out.html>`，再预览生成的 HTML。
+打开流程：Skill 先调用 `orchestrator_capabilities`，把结果写入临时 JSON，在任意目录运行绝对路径脚本
+`node <skill-dir>/scripts/build-tier-profile.mjs <capabilities.json> [out.html]`（省略 `out.html` 时默认写入安全的临时目录并输出路径，不改动目标项目文件），再用 `html_preview` / `html_render` 预览生成的 HTML。
 如果窗口右上角显示 `内置预填目录` 而不是 `T3 Code · N providers`，说明注入失败，可在
-Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用时，直接打开原始模板。
+Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用时，直接打开原始模板 `assets/tier-profile.html`；预览工具不可用时，给出文件绝对路径用浏览器打开。
 说 `刷新 tier 窗口` 时会重新调用 `orchestrator_capabilities` 并重建窗口。
 
 返回方式二选一：

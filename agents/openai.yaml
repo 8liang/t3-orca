@@ -1,4 +1,4 @@
 interface:
   display_name: "T3 ORCA"
-  short_description: "Tiered delivery, parent review, and read-only review loops"
+  short_description: "Tiered delivery, read-only review loops, and Tier Profile setup"
   default_prompt: "用 $t3-orca 逐项开发这个任务。如果我没有提供 tiers，先打开一次 Tier Profile 窗口；然后由父线程 Review，发现问题回原 Thread 修复，每项通过后提交，不要 Push。"

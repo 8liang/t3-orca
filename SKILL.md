@@ -1,15 +1,24 @@
 ---
 name: t3-orca
-description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing. Includes a tiered-delivery preset for 逐项开发 with an interactive per-session Tier Profile window: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Also includes a review-loop preset: an independent read-only reviewer (the profile's `review` tier, default sol6.1 low) checks each round, the parent fixes and verifies, max 5 rounds, ignore false positives and style, report blockers. Use for parallel or cross-provider delegation and worktree-isolated child tasks. Do not use when one agent can finish ordinary work without delegation."
+description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing, plus quick Tier Profile setup (`配置`, `设置`, `setup`). Includes a tiered-delivery preset for 逐项开发 with an interactive per-session Tier Profile window: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Also includes a review-loop preset: an independent read-only reviewer (the profile's `review` tier, default sol6.1 low) checks each round, the parent fixes and verifies, max 5 rounds, ignore false positives and style, report blockers. Use for parallel or cross-provider delegation, worktree-isolated child tasks, or opening the Tier Profile configurator. Do not use when one agent can finish ordinary work without delegation."
 metadata:
-  short-description: Tiered delivery, parent review, and read-only review loops
+  short-description: Tiered delivery, read-only review loops, and Tier Profile setup
 ---
 
 # T3 ORCA
 
 ORCA = Orchestrator Routing & Capability Assignment. Use T3 Code's Orchestrator V2 to split work across child agents and choose each child's `providerInstanceId` and `model` from live capabilities, not from brand memory.
 
-Short invocation: `$t3-orca 逐项开发 <request>` applies the tiered-delivery preset below. `$t3-orca review 循环 <scope>` applies the review-loop preset.
+Short invocation: `$t3-orca 逐项开发 <request>` applies the tiered-delivery preset below. `$t3-orca review 循环 <scope>` applies the review-loop preset. `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup` (or `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup` when delivered to this skill) open the Tier Profile configurator directly.
+
+## Configuration-only command routing
+
+When the user asks only to configure or open the Tier Profile page — including `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, or `刷新 tier 窗口`:
+
+- **Configuration intent takes precedence over presets.** Do not start `tiered-delivery`, `review-loop`, or any delegation, and do not require an existing config or task selection merely to open the page.
+- **Existing config must not suppress explicit setup.** Even when inline `tiers:`, `.t3-orca/tiers.yaml`, or `~/.config/t3-orca/tiers.yaml` already exists, still build and open the window.
+- **Follow the Tier Profile window steps below** (`orchestrator_capabilities` -> absolute `node <skill-dir>/scripts/build-tier-profile.mjs` -> `html_preview` -> `html_render` with `height` capped at `2000`), keeping the target project's working tree untouched.
+- **Never overwrite `tiers.yaml` automatically or pretend the iframe saves files.** The embedded frame only stores drafts in browser `localStorage`; tell the user to copy the generated YAML back or download it to save manually.
 
 ## When to use
 
@@ -73,10 +82,10 @@ The window is built from [assets/tier-profile.html](assets/tier-profile.html) by
 Show it in T3 Code:
 
 1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file, for example `/tmp/t3-orca-capabilities.json`.
-2. Resolve `<skill-dir>` to the directory containing this `SKILL.md`, then run `node <skill-dir>/scripts/build-tier-profile.mjs /tmp/t3-orca-capabilities.json /tmp/t3-orca-tier-profile.html`. It prints the generated absolute path and injects the live catalog, so the window lists T3 Code's real providers and models instead of the seed catalog.
-3. Call `html_preview` with that path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and the returned `contentHeight` as `height` (cap 2000). Do not inline the HTML.
-4. Say one line: edit the tiers in the window, then copy the generated YAML back (or save it to `.t3-orca/tiers.yaml`). The `Capabilities` panel remains available for a manual override. If the user asks to refresh the catalog, call `orchestrator_capabilities` again, rebuild to the same path, and re-render.
-5. If `orchestrator_capabilities` or Node is unavailable, open the raw `assets/tier-profile.html` and use its manual `Capabilities` panel. If the preview tools are unavailable, or the user says the frame is not interactive, give them the absolute file path to open in a browser.
+2. Resolve `<skill-dir>` to the directory containing this `SKILL.md`, then run `node <skill-dir>/scripts/build-tier-profile.mjs /tmp/t3-orca-capabilities.json` from any working directory (passing an explicit temp output path such as `/tmp/t3-orca-tier-profile.html` is optional; omitting it writes to a safe unique temp file and prints its absolute path). Target project files stay untouched.
+3. Call `html_preview` with that printed path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000). Do not inline the HTML.
+4. Say one line: edit the tiers in the window, then copy the generated YAML back (or download `tiers.yaml` to save manually to `.t3-orca/tiers.yaml` or `~/.config/t3-orca/tiers.yaml`). Do not auto-overwrite any existing `tiers.yaml`, and do not claim the iframe writes files to disk. The `Capabilities` panel remains available for a manual override. If the user asks to refresh the catalog, call `orchestrator_capabilities` again, rebuild, and re-render.
+5. If `orchestrator_capabilities` or Node is unavailable, open/preview the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, or the user says the frame is not interactive, give them the absolute file path link to open in a browser.
 6. When they return the YAML, validate every target against `orchestrator_capabilities`, restate it once in compact form, and use it for the thread. Do not ask again per item.
 
 Chat fallback when no window is available:
