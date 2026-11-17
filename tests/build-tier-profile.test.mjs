@@ -30,6 +30,14 @@ function extractInjectedCapabilities(html) {
   return JSON.parse(JSON.stringify(sandbox.window.__T3_ORCA_CAPABILITIES__));
 }
 
+function extractInjectedProfile(html) {
+  const match = /<script>window\.__T3_ORCA_PROFILE__ = ([\s\S]*?);<\/script>/.exec(html);
+  assert.ok(match, "Expected injected __T3_ORCA_PROFILE__ script tag");
+  const sandbox = { window: {} };
+  vm.runInNewContext(`window.__T3_ORCA_PROFILE__ = ${match[1]};`, sandbox);
+  return JSON.parse(JSON.stringify(sandbox.window.__T3_ORCA_PROFILE__));
+}
+
 test("cross-cwd invocation with default safe temp output leaves target cwd untouched", () => {
   const targetCwd = makeTempDir("t3-orca-cwd-");
   const capsDir = makeTempDir("t3-orca-caps-");
@@ -87,6 +95,79 @@ test("supports explicit output path relative to caller cwd and stdin input", () 
     assert.equal(injected.providers[0].models[0].id, "gcp-ai/gemini-4-hydrogen[1m]");
   } finally {
     rmSync(callerCwd, { recursive: true, force: true });
+  }
+});
+
+test("injects an existing project profile for setup preloading", () => {
+  const workDir = makeTempDir("t3-orca-profile-");
+  const capsFile = join(workDir, "caps.json");
+  const profileFile = join(workDir, ".t3-orca", "tiers.yaml");
+  const outFile = join(workDir, "out.html");
+  mkdirSync(dirname(profileFile), { recursive: true });
+  const profileText = [
+    "tiers:",
+    "  ui: sol6.1 @ high",
+    "  code:",
+    "    provider: magpie",
+    "    model: dumate/deepseek-v41-flash[1m]",
+    "    options:",
+    "      effort: high",
+    "",
+  ].join("\n");
+
+  try {
+    writeFileSync(
+      capsFile,
+      JSON.stringify({
+        providers: [{ providerInstanceId: "codex", models: [{ id: "gpt-6.1-sol" }] }],
+      })
+    );
+    writeFileSync(profileFile, profileText);
+
+    const stdout = execFileSync(
+      process.execPath,
+      [scriptPath, "--profile", profileFile, capsFile, outFile],
+      { encoding: "utf8" }
+    );
+    assert.equal(realpathSync(stdout.trim()), realpathSync(outFile));
+
+    const injected = extractInjectedProfile(readFileSync(outFile, "utf8"));
+    assert.equal(injected.path, realpathSync(profileFile));
+    assert.equal(injected.text, profileText);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("reports a missing or empty profile file without a stack trace", () => {
+  const workDir = makeTempDir("t3-orca-profile-err-");
+  const capsFile = join(workDir, "caps.json");
+  const emptyProfile = join(workDir, "empty.yaml");
+
+  try {
+    writeFileSync(capsFile, JSON.stringify({ providers: [] }));
+    writeFileSync(emptyProfile, "   \n");
+
+    const missing = spawnSync(
+      process.execPath,
+      [scriptPath, "--profile", join(workDir, "missing.yaml"), capsFile],
+      { encoding: "utf8" }
+    );
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /Failed to read profile file/);
+    assert.doesNotMatch(missing.stderr, /at Object\./);
+
+    const empty = spawnSync(process.execPath, [scriptPath, "--profile", emptyProfile, capsFile], {
+      encoding: "utf8",
+    });
+    assert.equal(empty.status, 1);
+    assert.match(empty.stderr, /is empty/);
+
+    const noValue = spawnSync(process.execPath, [scriptPath, "--profile"], { encoding: "utf8" });
+    assert.equal(noValue.status, 2);
+    assert.match(noValue.stderr, /--profile requires a file path/);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
   }
 });
 

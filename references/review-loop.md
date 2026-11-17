@@ -45,8 +45,8 @@ The review-loop default for the `review` tier is `sol6.1 @ low` (provider `codex
 Resolve in this order:
 
 1. an explicit target in the current message (`派 claude opus 只读 review`, `review 用 sol6.1 high`);
-2. the `review` tier from the resolved profile: inline `tiers:`, then `.t3-orca/tiers.yaml`, then `~/.config/t3-orca/tiers.yaml`;
-3. the preset default `sol6.1 @ low`.
+2. the `review` tier from the project profile: inline `tiers:`, then `<project>/.t3-orca/tiers.yaml`;
+3. no project profile: open the Tier Profile window once, prefilled with the preset default `sol6.1 @ low`, and save the result to the project before starting.
 
 To get the reviewer from the example request, configure it in the same way as the development flow:
 
@@ -57,7 +57,7 @@ tiers:
 
 `review: parent` is a `tiered-delivery` value. Here it means the profile did not name a reviewer, so use the preset default. This preset always needs an independent reviewer.
 
-If no profile exists, do not open the Tier Profile window just for the review unless the user asks; use the explicit target or the preset default. If the user asks to configure tiers, resolve and validate it exactly as the development flow does, including the live-capabilities injection in the Tier Profile window.
+There is no global profile. If the project has no profile and the current message has no explicit target, open the Tier Profile window once so the project gets one; do not run on an unsaved default. If the user explicitly says to use the preset default for this run, use `sol6.1 @ low` without saving. If the user asks to configure tiers, resolve and validate it exactly as the development flow does, including the live-capabilities injection in the Tier Profile window.
 
 `ui`, `code`, and `fast` do not affect the reviewer. Use the effort configured on the `review` tier; do not override a concrete profile target with the preset default.
 

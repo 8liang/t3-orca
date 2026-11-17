@@ -1,18 +1,18 @@
 # Tier profile
 
-A per-session override for the `tiered-delivery` preset. The tier table in [tiered-delivery.md](tiered-delivery.md) is the default; a profile changes only the tiers that differ for the current task.
+A project-scoped routing profile for the `tiered-delivery` and `review-loop` presets. The tier table in [tiered-delivery.md](tiered-delivery.md) is the starting point used to prefill the setup page; the saved profile is what runs use.
 
-Use this when the user's model tiers change between sessions. Do not edit the skill or re-type a full provider/model/effort table for every item.
+There is no global profile. A profile belongs to the project that contains it, so switching projects does not reuse another project's tiers.
 
 ## Resolution order
 
 1. Inline `tiers:` block in the current message.
-2. Nearest `.t3-orca/tiers.yaml` from the current directory up to the git root.
-3. `~/.config/t3-orca/tiers.yaml`.
-4. Default profile in [tiered-delivery.md](tiered-delivery.md).
-5. Open the Tier Profile window once (or use the chat fallback below).
+2. Nearest `.t3-orca/tiers.yaml` from the current directory up to the project root.
+3. No project profile: open the Tier Profile window once (or use the chat fallback below), then save the result to the project.
 
-Inline wins over project config; project config wins over global config. Do not reuse a profile from another thread unless the user says to.
+The project root is the git root of the working directory, or the working directory itself outside a git repository. Do not read `~/.config/t3-orca/tiers.yaml` and do not silently fall back to the default table: a run without a project profile must configure one first.
+
+Inline wins for that run only and is not saved automatically. Do not reuse another project's profile unless the user explicitly copies it.
 
 ## Compact form
 
@@ -118,7 +118,7 @@ Compact and expanded forms can be mixed.
 
 ## Tier Profile window
 
-[assets/tier-profile.html](../assets/tier-profile.html) is the template for a self-contained configurator. [scripts/build-tier-profile.mjs](../scripts/build-tier-profile.mjs) injects the live catalog and writes a temporary copy; the generated page still works from `file://` and inside the T3 Code preview panel with no network or dependencies.
+[assets/tier-profile.html](../assets/tier-profile.html) is the template for a self-contained configurator. [scripts/build-tier-profile.mjs](../scripts/build-tier-profile.mjs) injects the live catalog, optionally injects the project's existing profile, and writes a temporary copy. The generated page still works from `file://` and inside the T3 Code preview panel with no network or dependencies.
 
 What it does:
 
@@ -127,18 +127,61 @@ What it does:
 - supports `parent`, `inherit`, and reuse-another-tier (`fast: code @ low`) modes;
 - applies friendly aliases;
 - loads the live `orchestrator_capabilities` catalog injected at build time;
+- preloads an existing project profile when built with `--profile <path>`, and shows `已载入项目配置`;
 - emits the compact or expanded `tiers:` block;
-- keeps named presets and the last edit in `localStorage`.
+- saves directly to `<config-base>/.t3-orca/tiers.yaml` through the optional loopback bridge, with copy/download as fallback;
+- keeps named presets in `localStorage` when the browser allows it.
+
+The T3 Code HTML attachment runs in a sandboxed frame without `allow-same-origin`, so `localStorage` is usually unavailable there. The page then shows `此窗口不能本地保存；请复制或下载`. Never treat a browser draft as the saved project config.
 
 ### Opening it
 
-When a thread has no usable profile — or whenever the user explicitly asks to open/configure tiers (`/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, `刷新 tier 窗口`) — open the window directly. Explicit setup requests take precedence over presets, require no delegation prerequisite, and must not be suppressed by an existing `tiers.yaml`:
+When the project has no usable profile — or whenever the user explicitly asks to open/configure tiers (`/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, `刷新 tier 窗口`) — open the window directly. Explicit setup requests take precedence over presets, require no delegation prerequisite, and must not be suppressed by an existing `tiers.yaml`:
 
-1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file.
-2. Run `node <skill-dir>/scripts/build-tier-profile.mjs <capabilities.json> [out.html]` using the absolute script path from any working directory (omitting `out.html` writes to a safe unique temp file and prints its absolute path; target project files stay untouched). It injects the result as `window.__T3_ORCA_CAPABILITIES__` and prints the generated path.
-3. Call `html_preview` with that path and `width: 1180`.
-4. Call `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000).
-5. Send one short line: edit the tiers, then copy the generated YAML back or download it to save manually to `.t3-orca/tiers.yaml`. Do not overwrite any existing config file automatically, and do not claim the embedded iframe saves files to disk.
+1. Resolve the project root and `<project>/.t3-orca/tiers.yaml`. Note whether it exists.
+2. Call `orchestrator_capabilities` and save the exact JSON result to a temp file.
+3. Run `node <skill-dir>/scripts/build-tier-profile.mjs [--profile <project>/.t3-orca/tiers.yaml] <capabilities.json> [out.html]` using the absolute script path from any working directory. Include `--profile` when the config exists so the page preloads it; omit it for a new profile. Omitting `out.html` writes to a safe unique temp file and prints its absolute path; target project files stay untouched. The builder injects `window.__T3_ORCA_CAPABILITIES__` and `window.__T3_ORCA_PROFILE__` and prints the generated path.
+4. Start the direct-save bridge as a long-running session (`<config-base>` is the directory containing the resolved `.t3-orca`, usually the project root):
+
+   ```bash
+   node <skill-dir>/scripts/tier-profile-bridge.mjs \
+     --project <config-base> \
+     --page <built.html> \
+     --ready-file /tmp/t3-orca-bridge-ready.json \
+     --idle-minutes 60
+   ```
+
+   It prints and writes `{ page, pageUrl, pageRoute, port, target, pid }`. The bridge serves the page at `/page` and the save endpoint at `/save`.
+5. Prefer `preview_open` in T3 Code:
+
+   ```json
+   { "target": { "kind": "environment-port", "port": <port>, "path": "<pageRoute>" }, "open": true }
+   ```
+
+   The page opens in the T3 preview browser with `已载入项目配置` (when built with `--profile`) or `新建配置`. The user edits the tiers and clicks **保存到项目**; the bridge writes the YAML atomically and the page shows `已保存到 <path>`.
+6. Do **not** use `html_render` for the bridge-served page. T3's HTML renderer runs headless Chrome with a SOCKS proxy (`--proxy-bypass-list=<-loopback>`) that refuses loopback/private targets, so the page shows `本地桥接不可用`. Use `html_render` only for the copy/download fallback below.
+7. Tell the user to reply when the page says saved. Then read `<config-base>/.t3-orca/tiers.yaml`, validate every target against the live capabilities, stop the bridge (`kill <pid>`), and restate the profile once.
+
+Fallback when the bridge cannot start, `preview_open` is unavailable, or the page cannot reach the bridge:
+
+1. Call `html_preview` with the file `page` path and `width: 1180`.
+2. Call `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000).
+3. Ask the user to copy the generated YAML back or download `tiers.yaml`.
+4. Save with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs) (YAML on stdin), or move the downloaded file to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.
+
+### Direct-save bridge
+
+[scripts/tier-profile-bridge.mjs](../scripts/tier-profile-bridge.mjs) is a short-lived local helper:
+
+- binds `127.0.0.1` on a random port; never exposes a LAN interface;
+- requires a 24-byte random token on `/page`, `/health`, `/save`, and `/shutdown`;
+- writes only the resolved `<config-base>/.t3-orca/tiers.yaml`, atomically, with a 64 KB body limit;
+- serves the configurator at `/page` with relative `/save` and `/health` URLs, so the preview browser is same-origin;
+- exits after the idle timeout (default 30 minutes) or when the agent stops it with `kill <pid>`.
+
+The bridge page is self-contained and offline apart from the bridge calls. The file `page` variant uses absolute `http://127.0.0.1:<port>/...` URLs for a regular browser; the `/page` variant uses relative URLs for `preview_open`.
+
+Do not run the bridge with `&` or `nohup` in this harness; start it as a long-running PTY session so it survives while the user edits. Do not leave it running after the config is saved.
 
 Do not paste the HTML source into the thread. Do not also dump a long provider/model table.
 
@@ -162,16 +205,29 @@ tiers:
   review: parent
 
 Reply with the full block or only the lines you changed. I will validate the
-targets against the live capabilities and use this profile for the thread.
+targets against the live capabilities, save the result to the project's
+`.t3-orca/tiers.yaml`, and use it for this project.
 ```
 
 ### After the window
 
-- Treat the returned YAML as an inline `tiers:` block, whether it came from chat or a saved file.
 - Validate every target against the live capabilities.
+- If the user saved with **保存到项目**, the file is already written; read it and validate. If they copied or downloaded the YAML instead, save it to the resolved `<config-base>/.t3-orca/tiers.yaml` before delegating (usually the project root):
+
+  ```bash
+  node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base> <<'YAML'
+  tiers:
+    ...
+  YAML
+  ```
+
+  Feed the YAML on stdin. The helper creates `.t3-orca/`, writes atomically, and refuses a `.t3-orca` directory that resolves outside the project. It prints the target path.
+- Stop the bridge after the file is saved (`kill <pid>`); do not leave the loopback server running.
+- For an explicit `setup` request, the returned YAML is the user's confirmation; replacing the existing project config is expected. For a first run, create it. If the user cancels, leave the existing file unchanged.
+- If the user downloaded `tiers.yaml` instead of pasting it, move or copy that file to `<project>/.t3-orca/tiers.yaml` after confirming the path.
 - Restate the accepted profile once in compact form.
 - If the user only changed a few rows, keep the remaining tiers from the base profile; the window's `仅输出改动` mode emits exactly that overlay.
-- Do not reopen the window or ask again for the same thread unless the user asks to change tiers.
+- Do not reopen the window or ask again for the same project unless the user asks to change tiers or the file is missing.
 
 ## Partial replies
 
@@ -181,11 +237,11 @@ targets against the live capabilities and use this profile for the thread.
 - `tier: default` resets that tier to the default profile.
 - `tier: inherit` sets that tier to the parent provider/model/options.
 
-After accepting a profile, restate it once in compact form and use it for the rest of the thread. Do not ask again unless the user changes it or says the tiers differ.
+After accepting and saving a profile, restate it once in compact form and use it for the rest of the project. Do not ask again unless the user changes it or the file is missing.
 
 Natural-language overrides are allowed. Map them to the compact form, restate the result once, and proceed. For example, `code 用 cursor opus max` becomes `code: cursor:claude-opus-5-5 @ effort=max`.
 
-`reset tiers` or `use default tiers` clears the session profile and returns to the default table.
+`reset tiers` or `use default tiers` resets the in-memory profile to the default table. It does not delete the project file until the user saves the reset.
 
 ## Validation
 
@@ -206,16 +262,16 @@ If the profile names a provider that was not in the last capability payload, cal
 
 ## Saving
 
-- Inline only: use the profile for this thread.
-- "Save for this project": write `.t3-orca/tiers.yaml` at the project root.
-- "Save globally": write `~/.config/t3-orca/tiers.yaml` only with explicit permission.
-- Before overwriting an existing config file, show the proposed content and ask.
+- Inline only: use the profile for this run; do not write a file.
+- Project profile: write `<project>/.t3-orca/tiers.yaml` with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs). The helper creates `.t3-orca/`, writes atomically, and refuses paths outside the project.
+- There is no global config. Do not write `~/.config/t3-orca/tiers.yaml`.
+- For a first-time setup, write the returned YAML directly. For an explicit `setup`/edit of an existing profile, the returned YAML is the confirmation to replace it. In any other case where the user did not ask to change an existing file, show the proposed content and ask before replacing.
 
 The template is in [assets/tier-profile.template.yaml](../assets/tier-profile.template.yaml).
 
 ## Examples
 
-Change only the UI target for this session:
+Change only the UI target for this project:
 
 ```yaml
 tiers:

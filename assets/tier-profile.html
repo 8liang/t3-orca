@@ -116,6 +116,12 @@
     color: var(--accent);
   }
 
+  .badge.loaded {
+    border-color: #2f4a66;
+    background: #101a24;
+    color: #8fc6ff;
+  }
+
   .badge .dot {
     width: 5px;
     height: 5px;
@@ -640,6 +646,16 @@
     font: 10.5px var(--mono);
   }
 
+  .bridge-status {
+    margin: 8px 0 0;
+    color: var(--dim);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .bridge-status.ok { color: var(--accent); }
+  .bridge-status.err { color: var(--err); }
+
   #toast {
     position: fixed;
     left: 50%;
@@ -685,6 +701,7 @@
       <p>为本次 <strong>逐项开发 / review 循环</strong> 指定 tier → provider / model / 强度</p>
     </div>
     <div class="top-actions">
+      <span class="badge" id="profileBadge"><span class="dot"></span><span id="profileBadgeText">新建配置</span></span>
       <span class="badge" id="capsBadge"><span class="dot"></span><span id="capsBadgeText">内置预填目录</span></span>
       <button type="button" class="btn" id="openCaps">Capabilities</button>
     </div>
@@ -738,14 +755,17 @@
         </div>
         <pre class="yaml" id="yamlOut" title="点击全选"></pre>
         <div class="actions">
-          <button type="button" class="btn primary wide" id="copyYaml">复制 YAML</button>
+          <button type="button" class="btn primary wide" id="saveProject" hidden>保存到项目</button>
+          <button type="button" class="btn wide" id="copyYaml">复制 YAML</button>
           <button type="button" class="btn" id="copyMessage">复制为消息</button>
           <button type="button" class="btn" id="download">下载 tiers.yaml</button>
         </div>
+        <p class="bridge-status" id="bridgeStatus"></p>
         <ul class="issues" id="issues"></ul>
         <p class="foot-hint">
-          只改需要变的 tier；未列出的沿用默认。可粘贴回聊天，或保存到
-          <code>.t3-orca/tiers.yaml</code>。review 目标仍会按 live capabilities 校验。
+          只改需要变的 tier；未列出的沿用默认。有 <b>保存到项目</b> 按钮时直接点击写入
+          <code>.t3-orca/tiers.yaml</code>；按钮不可用时复制 YAML 回聊天或下载后保存到该位置。
+          review 目标仍会按 live capabilities 校验。
         </p>
       </div>
     </aside>
@@ -759,6 +779,9 @@
   "use strict";
 
   const STORAGE_KEY = "t3orca" + ".tier-profile.v2";
+  const BRIDGE = window.__T3_ORCA_BRIDGE__ && typeof window.__T3_ORCA_BRIDGE__ === "object"
+    ? window.__T3_ORCA_BRIDGE__
+    : null;
   const EFFORT_KEYS = ["reasoningEffort", "effort", "reasoning_effort", "thinking_level", "thinking", "mode"];
   const ROLES = ["design", "implementation", "test", "review", "research", "general"];
   const ROLE_BY_TIER = {
@@ -873,7 +896,6 @@
   }
 
   let state = loadState();
-  applyInjectedCaps();
   const storageAvailable = (() => {
     try {
       const probe = STORAGE_KEY + ".probe";
@@ -889,6 +911,11 @@
   const customModel = new Set();
   let pendingDelete = null;
   let deleteTimer = null;
+  let bridgeReady = false;
+  let bridgeBusy = false;
+  let bridgeChecked = false;
+  applyInjectedCaps();
+  applyInjectedProfile();
 
   function loadState() {
     const fresh = {
@@ -898,6 +925,9 @@
       caps: null,
       capsSource: null,
       capsError: null,
+      profileLoaded: false,
+      profilePath: null,
+      profileError: null,
       presets: {},
       activePreset: null
     };
@@ -929,6 +959,9 @@
         caps: null,
         capsSource: null,
         capsError: null,
+        profileLoaded: false,
+        profilePath: null,
+        profileError: null,
         presets: sanitizePresets(saved.presets),
         activePreset: typeof saved.activePreset === "string" ? saved.activePreset : null
       };
@@ -1385,6 +1418,10 @@
       add("error", `注入的 T3 Code capabilities 无效：${state.capsError}`);
     }
 
+    if (state.profileError) {
+      add("warn", `项目配置：${state.profileError}`);
+    }
+
     if (!state.caps) {
       add("info", "当前使用内置预填目录；在 T3 Code 中打开窗口会自动注入 live capabilities，提交后仍会按 live 目录校验。");
     } else {
@@ -1482,6 +1519,127 @@
     }
   }
 
+  function renderProfileBadge() {
+    if (typeof document === "undefined" || !document.getElementById) return;
+    const badge = document.getElementById("profileBadge");
+    const text = document.getElementById("profileBadgeText");
+    if (!badge || !text) return;
+    if (state.profileLoaded) {
+      const path = state.profilePath || ".t3-orca/tiers.yaml";
+      badge.classList.add("loaded");
+      badge.title = path;
+      text.textContent = path.endsWith("/.t3-orca/tiers.yaml") ? "已载入项目配置" : `已载入 ${path}`;
+    } else {
+      badge.classList.remove("loaded");
+      badge.title = "项目中没有 .t3-orca/tiers.yaml";
+      text.textContent = "新建配置";
+    }
+  }
+
+  function bridgeUrl(base) {
+    if (!BRIDGE || !base) return "";
+    try {
+      const url = new URL(base, window.location.href);
+      if (BRIDGE.token) url.searchParams.set("token", BRIDGE.token);
+      return url.toString();
+    } catch {
+      return "";
+    }
+  }
+
+  function renderBridgeState() {
+    if (typeof document === "undefined" || !document.getElementById) return;
+    const button = document.getElementById("saveProject");
+    const copy = document.getElementById("copyYaml");
+    const status = document.getElementById("bridgeStatus");
+    if (!button || !copy || !status) return;
+    const hasBridge = Boolean(BRIDGE && BRIDGE.url && BRIDGE.token);
+    const canSave = hasBridge && bridgeReady;
+    button.hidden = !canSave;
+    button.disabled = bridgeBusy;
+    copy.classList.toggle("primary", !canSave);
+    copy.classList.toggle("wide", true);
+
+    if (!hasBridge) {
+      status.hidden = false;
+      status.className = "bridge-status";
+      status.textContent = "未启用本地直写；复制 YAML 回聊天或下载后保存到 .t3-orca/tiers.yaml。";
+      return;
+    }
+    if (!bridgeChecked) {
+      status.hidden = false;
+      status.className = "bridge-status";
+      status.textContent = "正在检测本地直写…";
+      return;
+    }
+    if (bridgeBusy) {
+      status.hidden = false;
+      status.className = "bridge-status";
+      status.textContent = "正在写入项目配置…";
+      return;
+    }
+    if (canSave) {
+      status.hidden = false;
+      status.className = "bridge-status ok";
+      status.textContent = state.bridgeSaved
+        ? `已保存到 ${state.savedPath || BRIDGE.target || ".t3-orca/tiers.yaml"}`
+        : `本地直写可用：${BRIDGE.target || ".t3-orca/tiers.yaml"}`;
+      return;
+    }
+    status.hidden = false;
+    status.className = "bridge-status err";
+    status.textContent = "本地桥接不可用；请复制 YAML 回聊天或下载后保存。";
+  }
+
+  async function checkBridge() {
+    if (!BRIDGE || !BRIDGE.healthUrl || !BRIDGE.token) {
+      bridgeChecked = true;
+      renderBridgeState();
+      return;
+    }
+    try {
+      const response = await fetch(bridgeUrl(BRIDGE.healthUrl), { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json().catch(() => ({}));
+      bridgeReady = data.ok === true;
+    } catch {
+      bridgeReady = false;
+    } finally {
+      bridgeChecked = true;
+      renderBridgeState();
+    }
+  }
+
+  async function saveToProject() {
+    if (!BRIDGE || !bridgeReady || bridgeBusy) {
+      renderBridgeState();
+      return;
+    }
+    const yaml = document.getElementById("yamlOut").dataset.raw || "";
+    bridgeBusy = true;
+    renderBridgeState();
+    try {
+      const response = await fetch(bridgeUrl(BRIDGE.url), {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body: yaml,
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      state.bridgeSaved = true;
+      state.savedPath = data.path || BRIDGE.target || ".t3-orca/tiers.yaml";
+      toast(`已保存到 ${state.savedPath}`);
+    } catch (error) {
+      bridgeReady = false;
+      state.bridgeSaved = false;
+      toast(`保存失败：${error.message}；请复制或下载`);
+    } finally {
+      bridgeBusy = false;
+      renderBridgeState();
+    }
+  }
+
   function renderPresets() {
     const select = document.getElementById("presetSelect");
     const names = Object.keys(state.presets).sort((a, b) => a.localeCompare(b));
@@ -1495,17 +1653,23 @@
 
   function render(options) {
     // Reconcile restored drafts, provider changes, and dependent reuse tiers.
-    for (const tier of Object.values(state.tiers)) {
-      if (tier.mode === "target" || tier.mode === "same") pruneOptions(tier);
+    if (state.skipPruneOnce) {
+      state.skipPruneOnce = false;
+    } else {
+      for (const tier of Object.values(state.tiers)) {
+        if (tier.mode === "target" || tier.mode === "same") pruneOptions(tier);
+      }
     }
     const opts = options || {};
     if (opts.cards !== false) renderCards();
     renderYaml();
     renderIssues();
     renderCapsBadge();
+    renderProfileBadge();
+    renderBridgeState();
     if (opts.presets !== false) renderPresets();
     document.querySelector(".autosave").textContent = storageAvailable
-      ? "当前编辑自动保存"
+      ? "浏览器草稿已保存"
       : "此窗口不能本地保存；请复制或下载";
     persist();
   }
@@ -1594,6 +1758,8 @@
 
   function markEdited() {
     state.activePreset = null;
+    state.bridgeSaved = false;
+    renderBridgeState();
   }
 
   function pruneOptions(tier) {
@@ -1689,6 +1855,355 @@
     } catch (error) {
       state.capsError = error.message;
       console.warn("T3 ORCA: invalid injected capabilities", error);
+    }
+  }
+
+  function stripInlineComment(line) {
+    let single = false;
+    let double = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      if (char === "'" && !double) {
+        if (single && line[index + 1] === "'") {
+          index += 1;
+          continue;
+        }
+        single = !single;
+        continue;
+      }
+      if (char === '"' && !single && line[index - 1] !== "\\") {
+        double = !double;
+        continue;
+      }
+      if (char === "#" && !single && !double && (index === 0 || /\s/.test(line[index - 1]))) {
+        return line.slice(0, index);
+      }
+    }
+    return line;
+  }
+
+  function unquoteYaml(text) {
+    const value = String(text == null ? "" : text).trim();
+    if (value.startsWith('"') && value.endsWith('"')) {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.slice(1, -1);
+      }
+    }
+    if (value.startsWith("'") && value.endsWith("'")) {
+      return value.slice(1, -1).replace(/''/g, "'");
+    }
+    return value;
+  }
+
+  function coerceYamlScalar(text) {
+    const value = unquoteYaml(text);
+    if (value === "true") return true;
+    if (value === "false") return false;
+    if (value === "null" || value === "~") return "";
+    if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+    return value;
+  }
+
+  function parseProfileYaml(text) {
+    const source = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+    const lines = source.split("\n");
+    const result = { tiers: {}, diffOnly: false, warnings: [] };
+    result.diffOnly = lines.some((line) => line.trim() === "# 仅列出与默认 profile 不同的 tier");
+
+    let inTiers = false;
+    let tiersIndent = -1;
+    let entryIndent = null;
+    let current = null;
+    let currentIndent = -1;
+    let fieldIndent = null;
+    let optionsIndent = -1;
+
+    for (const rawLine of lines) {
+      const line = stripInlineComment(rawLine);
+      if (!line.trim()) continue;
+      const indent = line.match(/^\s*/)[0].length;
+      const content = line.trim();
+
+      if (!inTiers) {
+        if (/^tiers\s*:\s*\{\s*\}\s*$/.test(content)) {
+          inTiers = true;
+          tiersIndent = indent;
+          entryIndent = null;
+          continue;
+        }
+        if (/^tiers\s*:/.test(content)) {
+          inTiers = true;
+          tiersIndent = indent;
+          const rest = content.replace(/^tiers\s*:\s*/, "");
+          if (rest && rest !== "{}") result.warnings.push("tiers 不是块状写法，已忽略行内内容。");
+          continue;
+        }
+        continue;
+      }
+
+      if (indent <= tiersIndent) break;
+      if (entryIndent === null) entryIndent = indent;
+
+      if (indent === entryIndent) {
+        const match = content.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (!match) {
+          result.warnings.push("无法解析 tier 行：" + content);
+          continue;
+        }
+        const key = match[1];
+        const rawValue = match[2];
+        currentIndent = indent;
+        fieldIndent = null;
+        optionsIndent = -1;
+        if (!rawValue) {
+          current = {};
+          result.tiers[key] = current;
+        } else if (rawValue === "{}") {
+          current = { options: {} };
+          result.tiers[key] = current;
+        } else {
+          current = { __scalar: unquoteYaml(rawValue) };
+          result.tiers[key] = current;
+        }
+        continue;
+      }
+
+      if (!current || current.__scalar || indent <= currentIndent) continue;
+      if (fieldIndent === null || indent === fieldIndent) {
+        const match = content.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (!match) continue;
+        fieldIndent = indent;
+        const field = match[1];
+        const rawValue = match[2];
+        if (field === "options") {
+          current.options = {};
+          optionsIndent = rawValue ? -1 : indent;
+          if (rawValue && rawValue !== "{}") {
+            result.warnings.push(`tier ${field} 的 options 不是块状写法，已忽略行内内容。`);
+          }
+        } else {
+          current[field] = unquoteYaml(rawValue);
+        }
+        continue;
+      }
+      if (current.options && optionsIndent >= 0 && indent > optionsIndent) {
+        const match = content.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (match) current.options[match[1]] = coerceYamlScalar(match[2]);
+      }
+    }
+
+    for (const [key, value] of Object.entries(result.tiers)) {
+      if (value.__scalar !== undefined) {
+        result.tiers[key] = value.__scalar;
+      } else {
+        result.tiers[key] = {
+          mode: value.mode,
+          ref: value.ref,
+          provider: value.provider,
+          model: value.model,
+          role: value.role,
+          options: value.options || {}
+        };
+      }
+    }
+    return result;
+  }
+
+  function compactParts(value) {
+    const text = String(value == null ? "" : value).trim();
+    const at = text.indexOf(" @ ");
+    if (at < 0) return { head: text, optionsText: "" };
+    return { head: text.slice(0, at).trim(), optionsText: text.slice(at + 3).trim() };
+  }
+
+  function bareOptionValue(optionsText) {
+    for (const part of String(optionsText || "").split(",")) {
+      const entry = part.trim();
+      if (entry && !entry.includes("=")) return entry;
+    }
+    return "";
+  }
+
+  function applyOptionOverlay(tier, optionsText) {
+    const text = String(optionsText || "").trim();
+    if (!text) return;
+    const entries = parseOptionsText(text);
+    const bare = bareOptionValue(text);
+    const base = resolveBase(tier) || tier;
+    const primary = base ? primaryOptionAt(base.provider, base.model) || primaryOptionFor(base) : null;
+    tier.options = { ...cleanOptions(tier.options) };
+    if (bare) tier.options[primary ? primary.id : "effort"] = bare;
+    Object.assign(tier.options, entries);
+  }
+
+  function markCustomTarget(key) {
+    const tier = state.tiers[key];
+    const provider = providerById(tier.provider);
+    if (provider) customProvider.delete(key);
+    else customProvider.add(key);
+    if (provider && modelById(provider, tier.model)) customModel.delete(key);
+    else customModel.add(key);
+  }
+
+  function applyProfileScalar(key, rawValue) {
+    const value = String(rawValue == null ? "" : rawValue).trim();
+    if (!value) return;
+    const previous = state.tiers[key];
+    const role = previous && previous.role ? previous.role : inferRole(key);
+
+    if (value === "parent") {
+      state.tiers[key] = { mode: "parent", role, options: {} };
+      customProvider.delete(key);
+      customModel.delete(key);
+      return;
+    }
+    if (value === "inherit") {
+      state.tiers[key] = { mode: "inherit", role, options: {} };
+      customProvider.delete(key);
+      customModel.delete(key);
+      return;
+    }
+    if (value === "default") {
+      if (DEFAULT_TIERS[key]) {
+        state.tiers[key] = clone(DEFAULT_TIERS[key]);
+      } else {
+        delete state.tiers[key];
+        state.order = state.order.filter((item) => item !== key);
+      }
+      customProvider.delete(key);
+      customModel.delete(key);
+      return;
+    }
+
+    const { head, optionsText } = compactParts(value);
+    if (!head) return;
+
+    if (head !== key && state.tiers[head]) {
+      state.tiers[key] = { mode: "same", ref: head, role, options: {} };
+      applyOptionOverlay(state.tiers[key], optionsText);
+      customProvider.delete(key);
+      customModel.delete(key);
+      return;
+    }
+
+    if (head.includes(":")) {
+      const split = head.indexOf(":");
+      state.tiers[key] = {
+        mode: "target",
+        provider: head.slice(0, split).trim(),
+        model: head.slice(split + 1).trim(),
+        role,
+        options: {}
+      };
+      applyOptionOverlay(state.tiers[key], optionsText);
+      markCustomTarget(key);
+      return;
+    }
+
+    const normalized = head.toLowerCase().replace(/[\s_-]+/g, "");
+    const alias = ALIASES.find((item) => item.name.toLowerCase().replace(/[\s_-]+/g, "") === normalized);
+    if (alias) {
+      applyAlias(key, alias.name, false);
+      const tier = state.tiers[key];
+      if (tier) applyOptionOverlay(tier, optionsText);
+      return;
+    }
+
+    const matches = [];
+    for (const provider of catalog().filter(providerEligible)) {
+      for (const model of provider.models || []) {
+        if (model.id === head || String(model.label || "").toLowerCase() === head.toLowerCase()) {
+          matches.push({ provider, model });
+        }
+      }
+    }
+    if (matches.length === 1) {
+      state.tiers[key] = {
+        mode: "target",
+        provider: matches[0].provider.id,
+        model: matches[0].model.id,
+        role,
+        options: {}
+      };
+      applyOptionOverlay(state.tiers[key], optionsText);
+      customProvider.delete(key);
+      customModel.delete(key);
+      return;
+    }
+
+    state.tiers[key] = { mode: "target", provider: "", model: head, role, options: {} };
+    applyOptionOverlay(state.tiers[key], optionsText);
+    customProvider.add(key);
+    customModel.add(key);
+  }
+
+  function applyProfileMap(key, value) {
+    const previous = state.tiers[key];
+    const role = ROLES.includes(value.role) ? value.role : previous && previous.role ? previous.role : inferRole(key);
+    const mode = String(value.mode || (value.ref ? "same" : "target"));
+    if (mode === "parent" || mode === "inherit") {
+      state.tiers[key] = { mode, role, options: {} };
+    } else if (mode === "same") {
+      state.tiers[key] = { mode: "same", ref: value.ref || "", role, options: {} };
+      applyOptionOverlay(state.tiers[key], "");
+      Object.assign(state.tiers[key].options, cleanOptions(value.options));
+    } else {
+      state.tiers[key] = {
+        mode: "target",
+        provider: String(value.provider || ""),
+        model: String(value.model || ""),
+        role,
+        options: { ...cleanOptions(value.options) }
+      };
+    }
+    if (value.role && !ROLES.includes(value.role)) {
+      state.profileError = `${key}: 未知 role “${value.role}”，已使用默认值。`;
+    }
+    if (state.tiers[key].mode === "target") markCustomTarget(key);
+    else {
+      customProvider.delete(key);
+      customModel.delete(key);
+    }
+  }
+
+  function applyProfileText(text, meta) {
+    const parsed = parseProfileYaml(text);
+    state.tiers = clone(DEFAULT_TIERS);
+    state.order = [...DEFAULT_ORDER];
+    state.diffOnly = Boolean(parsed.diffOnly);
+    state.profileLoaded = true;
+    state.profilePath = meta && meta.path ? String(meta.path) : null;
+    state.profileError = parsed.warnings.length ? parsed.warnings.join("；") : null;
+    state.skipPruneOnce = true;
+    state.activePreset = null;
+    customProvider.clear();
+    customModel.clear();
+
+    for (const key of Object.keys(parsed.tiers)) {
+      if (!state.tiers[key]) {
+        state.tiers[key] = { mode: "target", provider: "", model: "", role: inferRole(key), options: {} };
+        state.order.push(key);
+      }
+    }
+    for (const [key, value] of Object.entries(parsed.tiers)) {
+      if (typeof value === "string") applyProfileScalar(key, value);
+      else applyProfileMap(key, value);
+    }
+    return parsed;
+  }
+
+  function applyInjectedProfile() {
+    const injected = window.__T3_ORCA_PROFILE__;
+    if (!injected || typeof injected.text !== "string") return false;
+    try {
+      applyProfileText(injected.text, injected);
+      return true;
+    } catch (error) {
+      state.profileError = error.message;
+      console.warn("T3 ORCA: invalid injected profile", error);
+      return false;
     }
   }
 
@@ -1926,6 +2441,8 @@
     copyText(document.getElementById("yamlOut").dataset.raw || "", "YAML ");
   });
 
+  document.getElementById("saveProject").addEventListener("click", saveToProject);
+
   document.getElementById("copyMessage").addEventListener("click", () => {
     const yaml = document.getElementById("yamlOut").dataset.raw || "";
     const message = "$t3-orca 逐项开发\n\n```yaml\n" + yaml + "\n```\n";
@@ -2051,6 +2568,7 @@
 
   document.getElementById("diffOnly").checked = state.diffOnly;
   render();
+  checkBridge();
 
   document.getElementById("yamlOut").addEventListener("click", () => {
     const range = document.createRange();

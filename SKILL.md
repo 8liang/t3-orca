@@ -1,6 +1,6 @@
 ---
 name: t3-orca
-description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing, plus quick Tier Profile setup (`配置`, `设置`, `setup`). Includes a tiered-delivery preset for 逐项开发 with an interactive per-session Tier Profile window: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Also includes a review-loop preset: an independent read-only reviewer (the profile's `review` tier, default sol6.1 low) checks each round, the parent fixes and verifies, max 5 rounds, ignore false positives and style, report blockers. Use for parallel or cross-provider delegation, worktree-isolated child tasks, or opening the Tier Profile configurator. Do not use when one agent can finish ordinary work without delegation."
+description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing, plus project-scoped Tier Profile setup (`配置`, `设置`, `setup`). Configuration lives only in the project's `.t3-orca/tiers.yaml`; a run with no project profile opens the configurator once and saves the result, with one-click direct save through a short-lived loopback bridge when T3 preview_open is available and copy/download as the fallback. Later runs reuse the file. Includes a tiered-delivery preset for 逐项开发: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Also includes a review-loop preset: an independent read-only reviewer (the profile's `review` tier, default sol6.1 low) checks each round, the parent fixes and verifies, max 5 rounds, ignore false positives and style, report blockers. Use for parallel or cross-provider delegation, worktree-isolated child tasks, or opening the Tier Profile configurator. Do not use when one agent can finish ordinary work without delegation."
 metadata:
   short-description: Tiered delivery, read-only review loops, and Tier Profile setup
 ---
@@ -16,9 +16,9 @@ Short invocation: `$t3-orca 逐项开发 <request>` applies the tiered-delivery 
 When the user asks only to configure or open the Tier Profile page — including `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, or `刷新 tier 窗口`:
 
 - **Configuration intent takes precedence over presets.** Do not start `tiered-delivery`, `review-loop`, or any delegation, and do not require an existing config or task selection merely to open the page.
-- **Existing config must not suppress explicit setup.** Even when inline `tiers:`, `.t3-orca/tiers.yaml`, or `~/.config/t3-orca/tiers.yaml` already exists, still build and open the window.
-- **Follow the Tier Profile window steps below** (`orchestrator_capabilities` -> absolute `node <skill-dir>/scripts/build-tier-profile.mjs` -> `html_preview` -> `html_render` with `height` capped at `2000`), keeping the target project's working tree untouched.
-- **Never overwrite `tiers.yaml` automatically or pretend the iframe saves files.** The embedded frame only stores drafts in browser `localStorage`; tell the user to copy the generated YAML back or download it to save manually.
+- **Existing config must not suppress explicit setup.** Even when inline `tiers:` or a project `.t3-orca/tiers.yaml` already exists, still build and open the window. If the project config exists, pass it to the builder with `--profile` so the page preloads it.
+- **Follow the Tier Profile window steps below** (`orchestrator_capabilities` -> absolute `node <skill-dir>/scripts/build-tier-profile.mjs [--profile <config>]` -> `tier-profile-bridge.mjs` -> `preview_open`; fallback `html_preview` -> `html_render` with `height` capped at `2000`), keeping the target project's working tree untouched.
+- **The page itself never writes files directly.** Prefer the bridge-served page via `preview_open` so the **保存到项目** button writes through the local bridge. If the bridge is unavailable, the inline iframe only generates YAML; ask the user to copy or download it, then write it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <project-root>`. Do not claim the inline iframe saves the file.
 
 ## When to use
 
@@ -70,23 +70,56 @@ Short form:
 
 ### Tier profile window
 
-The short form above is the default profile. Tiers change between sessions, so resolve a profile before delegating:
+The short form above is the default profile used to prefill the setup page. Configuration is project-scoped only: there is no global profile. Before delegating, resolve the project root (the git root of the working directory, or the working directory outside a repo) and check `<project>/.t3-orca/tiers.yaml`:
 
-1. an inline `tiers:` block in the current message;
-2. the nearest `.t3-orca/tiers.yaml` from the working directory up to the git root;
-3. `~/.config/t3-orca/tiers.yaml`;
-4. otherwise open the Tier Profile window once.
+1. an inline `tiers:` block in the current message wins for this run;
+2. otherwise use the nearest `<project>/.t3-orca/tiers.yaml` found from the working directory up to the project root;
+3. otherwise open the Tier Profile window once, let the user choose, and save the result to `<project>/.t3-orca/tiers.yaml` before delegating.
 
-The window is built from [assets/tier-profile.html](assets/tier-profile.html) by [scripts/build-tier-profile.mjs](scripts/build-tier-profile.mjs). It is a self-contained, offline configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, live-catalog validation, saved presets, and a generated `tiers:` block.
+Do not read or write `~/.config/t3-orca/tiers.yaml`, and do not silently run on the default table when the project has no profile.
+
+The window is built from [assets/tier-profile.html](assets/tier-profile.html) by [scripts/build-tier-profile.mjs](scripts/build-tier-profile.mjs). It is a self-contained configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, live-catalog validation, saved presets, and a generated `tiers:` block. [scripts/tier-profile-bridge.mjs](scripts/tier-profile-bridge.mjs) adds a short-lived loopback save bridge so the page can write the project config with one click.
 
 Show it in T3 Code:
 
-1. Call `orchestrator_capabilities` and save the exact JSON result to a temp file, for example `/tmp/t3-orca-capabilities.json`.
-2. Resolve `<skill-dir>` to the directory containing this `SKILL.md`, then run `node <skill-dir>/scripts/build-tier-profile.mjs /tmp/t3-orca-capabilities.json` from any working directory (passing an explicit temp output path such as `/tmp/t3-orca-tier-profile.html` is optional; omitting it writes to a safe unique temp file and prints its absolute path). Target project files stay untouched.
-3. Call `html_preview` with that printed path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000). Do not inline the HTML.
-4. Say one line: edit the tiers in the window, then copy the generated YAML back (or download `tiers.yaml` to save manually to `.t3-orca/tiers.yaml` or `~/.config/t3-orca/tiers.yaml`). Do not auto-overwrite any existing `tiers.yaml`, and do not claim the iframe writes files to disk. The `Capabilities` panel remains available for a manual override. If the user asks to refresh the catalog, call `orchestrator_capabilities` again, rebuild, and re-render.
-5. If `orchestrator_capabilities` or Node is unavailable, open/preview the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, or the user says the frame is not interactive, give them the absolute file path link to open in a browser.
-6. When they return the YAML, validate every target against `orchestrator_capabilities`, restate it once in compact form, and use it for the thread. Do not ask again per item.
+```bash
+project=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+config="$project/.t3-orca/tiers.yaml"
+d="$PWD"
+while :; do
+  if [ -f "$d/.t3-orca/tiers.yaml" ]; then config="$d/.t3-orca/tiers.yaml"; break; fi
+  [ "$d" = "$project" ] && break
+  d=$(dirname "$d")
+done
+test -f "$config" && echo "exists: $config" || echo "missing: $config"
+```
+
+1. Run the discovery command above and note whether the file already exists.
+2. Call `orchestrator_capabilities` and save the exact JSON result to a temp file, for example `/tmp/t3-orca-capabilities.json`.
+3. Resolve `<skill-dir>` to the directory containing this `SKILL.md`, then run `node <skill-dir>/scripts/build-tier-profile.mjs --profile <config> /tmp/t3-orca-capabilities.json` when the config exists, or omit `--profile` when it does not. Run from any working directory; passing an explicit temp output path such as `/tmp/t3-orca-tier-profile.html` is optional (omitting it writes to a safe unique temp file and prints its absolute path). Target project files stay untouched.
+4. Start the direct-save bridge as a long-running PTY session (do not background it with `&`; this harness reaps detached children). `<config-base>` is the directory containing the resolved `.t3-orca` (usually the project root):
+
+   ```bash
+   node <skill-dir>/scripts/tier-profile-bridge.mjs \
+     --project <config-base> \
+     --page <built.html> \
+     --ready-file /tmp/t3-orca-bridge-ready.json \
+     --idle-minutes 60
+   ```
+
+   It prints `{ page, pageUrl, pageRoute, port, target, pid }` and also writes that JSON to the ready file. The server binds `127.0.0.1` only, requires a random token, writes only `<config-base>/.t3-orca/tiers.yaml`, and idles out after the given minutes.
+5. If `preview_open` is available, open the bridge-served page in the T3 preview browser:
+
+   ```json
+   { "target": { "kind": "environment-port", "port": <port>, "path": "<pageRoute>" }, "open": true }
+   ```
+
+   This is the preferred path in T3 Code. Do **not** use `html_render` for the bridge page: T3's HTML renderer runs through a SOCKS proxy that blocks loopback, so the save button would show `本地桥接不可用`. With `--profile`, the page shows `已载入项目配置`; without it, it starts from the default table.
+6. Say one line: edit the tiers, then click **保存到项目**. The page writes the YAML through the bridge and shows `已保存到 <path>`. Ask the user to reply when it is saved. If the user asks to refresh the catalog, stop the bridge, call `orchestrator_capabilities` again, rebuild, and restart the bridge.
+7. When the user confirms, read `<config-base>/.t3-orca/tiers.yaml`, validate every target against `orchestrator_capabilities`, stop the bridge (`kill <pid>`), restate the profile once in compact form, and use it for the project. Do not ask again per item.
+8. Fallback if the bridge cannot start, `preview_open` is unavailable, or the page shows `本地桥接不可用`: call `html_preview` with the file `page` path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height`. Ask the user to copy the YAML back or download it, then save it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` (YAML on stdin). If they downloaded `tiers.yaml`, move or copy it to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.
+
+If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, or the frame is not interactive, give the user the absolute file path to open in a browser.
 
 Chat fallback when no window is available:
 
@@ -98,7 +131,7 @@ tiers:
   review: parent
 ```
 
-Say only changed lines are required; tiers can be added or removed. Then validate against capabilities and use it. See [references/tier-profile.md](references/tier-profile.md).
+Say only changed lines are required; tiers can be added or removed. Then validate against capabilities, save it to `<project>/.t3-orca/tiers.yaml` with `scripts/save-tier-profile.mjs`, and use it. See [references/tier-profile.md](references/tier-profile.md).
 
 The `review-loop` preset reuses this profile's `review` tier; it does not maintain a separate reviewer setting.
 
@@ -108,7 +141,7 @@ When the user says `review 循环`, `review-loop`, `只读 Review 循环`, says 
 
 Short form:
 
-- The reviewer is the **`review` tier from the same tier profile the development flow uses**, started fresh every round. Resolve it exactly like `逐项开发`: inline `tiers:` → nearest `.t3-orca/tiers.yaml` → `~/.config/t3-orca/tiers.yaml` → this preset's default profile. An explicit target in the current message wins over the profile. Never the parent alone, and never `t3_thread_send` to an earlier reviewer.
+- The reviewer is the **`review` tier from the same project profile the development flow uses**, started fresh every round. Resolve it exactly like `逐项开发`: inline `tiers:` → nearest `<project>/.t3-orca/tiers.yaml` → project setup opened once with the preset default prefilled. An explicit target in the current message wins over the profile. Never use a global config, never the parent alone, and never `t3_thread_send` to an earlier reviewer.
 - The review-loop default for the `review` tier is `sol6.1 @ low` (provider `codex`, model `gpt-6.1-sol`, `reasoningEffort: low`). `review: parent` is a tiered-delivery value; here it means unset, so use this default. Do not maintain a separate reviewer setting.
 - The **parent fixes and verifies**. Fix only substantive findings yourself, run tests, then start the next round.
 - **Ignore false positives and style-only suggestions.** Record them; do not change code for them and never spend a round on them.
@@ -129,7 +162,7 @@ Short form:
 8. **No secrets in `task`.** Use `request_secret`. Never put tokens, passwords, or private keys in a child brief.
 9. **A delegated child does not re-delegate.** If you are the child, do the work yourself. Start no subagents unless your brief explicitly authorizes it.
 10. **Apply a preset only when it fits.** Use `tiered-delivery` when the user invokes it by name or gives a multi-item implementation request that also asks for autonomous review/commit handling. Use `review-loop` when the user asks for a delegated review-and-fix loop. Do not apply either preset's review, fix, round-limit, or commit rules to ordinary one-off delegation.
-11. **Resolve the tier profile once per thread.** Check the inline `tiers:` block, the nearest `.t3-orca/tiers.yaml`, then `~/.config/t3-orca/tiers.yaml`. For `tiered-delivery`, if none exists, open the Tier Profile window once (or use the chat fallback). For `review-loop`, use the configured `review` tier or the preset default; open the window only if the user asks to configure tiers. Do not ask for tier settings per item, and do not assume another session's profile still applies.
+11. **Resolve the tier profile once per thread.** Check the inline `tiers:` block, then the nearest `<project>/.t3-orca/tiers.yaml`. There is no global profile. If neither exists, open the Tier Profile window once (or use the chat fallback), let the user choose, and save the result to the project before delegating. For `review-loop`, the same rule applies; the page is prefilled with `sol6.1 @ low` unless the user explicitly says to use the preset default for this run. Do not ask for tier settings per item, and do not assume another project's profile applies.
 12. **The review-loop reviewer stays read-only.** The reviewer never edits, stages, commits, or pushes; the parent owns fixes and verification. Never send fixes to the reviewer, never let style or false positives extend the loop, and never exceed 5 rounds without explicit authorization.
 
 ## Core workflow
@@ -230,6 +263,9 @@ In the `tiered-delivery` preset, the `review` row is the parent thread by defaul
 | Orchestrator tools absent | Try the tool name once; T3 tools may load late. If it is still absent, report that Orchestrator V2 is unavailable. Do not fake delegation with shell commands, native agents, or a CLI. |
 | Provider or model unavailable | Report the exact target and the error. Do not fall back to native tools, workflows, or CLIs unless the user approves. |
 | Child asks a question or needs approval | Surface it, or answer in the child thread if authorized. Do not guess. |
+| No project `.t3-orca/tiers.yaml` | Open the Tier Profile window once and save the result. Do not run on an unsaved default or a global config. |
+| Bridge page shows `本地桥接不可用` in `html_render` | T3's HTML renderer uses a SOCKS proxy that blocks loopback. Open the same bridge page with `preview_open` (`environment-port`), or fall back to copy/download. |
+| Bridge process exited or `preview_open` unavailable | Restart the bridge once; if it still fails, use the copy/download fallback. Do not leave the user with an unsaved profile. |
 | Substantive findings remain after round 5 | Mark the item or work blocked; do not commit. In `review-loop`, report the blocking reasons and recommended next options. Continue only with explicit authorization. |
 | Review reports only style, nits, or false positives | Treat the round as clean after triage; record the dismissed items; do not fix them to please the reviewer. |
 | Reviewer leaves unexpected working-tree changes | Stop and report. The review was not read-only; do not reset the tree blindly. |
@@ -240,7 +276,7 @@ In the `tiered-delivery` preset, the `review` row is the parent thread by defaul
 - [references/routing.md](references/routing.md) - capability signals, candidate scoring, and worked routing examples.
 - [references/tiered-delivery.md](references/tiered-delivery.md) - tier aliases, parent-review loop, 5-round limit, and per-item commit rules.
 - [references/review-loop.md](references/review-loop.md) - independent read-only review rounds, parent fix-and-verify loop, triage, 5-round limit, and blocking report.
-- [references/tier-profile.md](references/tier-profile.md) - per-session `tiers:` overrides, the HTML window, resolution order, and validation.
+- [references/tier-profile.md](references/tier-profile.md) - project-scoped `tiers:` profiles, the HTML window, preloading, saving, and validation.
 - [references/patterns.md](references/patterns.md) - fan-out, pipeline, review loop, worktree, escalation, and brief templates.
 
 ## Anti-patterns
@@ -261,5 +297,10 @@ In the `tiered-delivery` preset, the `review` row is the parent thread by defaul
 - Asking the user for provider, model, or effort when the `tiered-delivery` tier is known.
 - Pasting a long provider/model/effort template instead of opening the Tier Profile window.
 - Asking for tier settings per item instead of once per thread.
-- Assuming the last session's tier profile without checking.
+- Reading or writing a global `~/.config/t3-orca/tiers.yaml`.
+- Silently using the default table when the project has no `.t3-orca/tiers.yaml`.
+- Assuming another project's tier profile applies without checking.
+- Claiming the iframe writes `.t3-orca/tiers.yaml`; it only generates YAML.
+- Using `html_render` for the bridge page when `preview_open` is available; the inline renderer's SOCKS proxy blocks loopback.
+- Starting the bridge with `&` or `nohup` in this harness instead of a long-running PTY session.
 - Committing an item before tests and review pass, or pushing without being asked.

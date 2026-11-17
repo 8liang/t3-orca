@@ -23,9 +23,9 @@ Invoking this preset authorizes a reported fallback when a tier target is unavai
 
 ## Tier profile
 
-The table below is the default profile. Each session can override it with an inline `tiers:` block, a project `.t3-orca/tiers.yaml`, or a global `~/.config/t3-orca/tiers.yaml`. Inline wins over project, and project wins over global.
+The table below is the default profile used to prefill the setup page. A run resolves an inline `tiers:` block first, then the project's `.t3-orca/tiers.yaml`. There is no global profile.
 
-If no profile exists, open the Tier Profile window once and ask for the generated block. Do not ask for provider, model, or effort per item, and do not reuse another thread's profile. See [tier-profile.md](tier-profile.md).
+If the project has no profile, open the Tier Profile window once, let the user choose, and save the generated YAML to `<project>/.t3-orca/tiers.yaml` before delegating. Do not silently use the default table, do not ask for provider/model/effort per item, and do not reuse another project's profile. See [tier-profile.md](tier-profile.md).
 
 Profiles can use friendly aliases such as `ui: sol6.1 @ high` and `code: deepseek-flash-claude @ high`; see [tier-profile.md](tier-profile.md) for the grammar and validation rules.
 
@@ -58,7 +58,7 @@ Classify each item by its dominant capability:
 
 ## Resolution algorithm
 
-1. Call `orchestrator_capabilities` once for the thread. Resolve the tier profile: inline `tiers:`, project `.t3-orca/tiers.yaml`, global config, then the default table. If none is present, open the Tier Profile window once as described in [tier-profile.md](tier-profile.md), prefilled with the default table. Do not ask per item.
+1. Call `orchestrator_capabilities` once for the thread. Resolve the tier profile: inline `tiers:`, then project `.t3-orca/tiers.yaml`. If neither is present, open the Tier Profile window once as described in [tier-profile.md](tier-profile.md), prefilled with the default table, and save the result to the project. Do not ask per item.
 2. Find the exact preferred target by `providerInstanceId` and model `id`.
 3. Reject the provider/model if `canRunChildTask` is false, `constraints` is non-empty, or the model is absent. If only a preferred option value is invalid, keep the model and handle it in step 5.
 4. If the exact target is unavailable, score eligible fallbacks:

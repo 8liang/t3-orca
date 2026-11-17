@@ -55,33 +55,37 @@ $t3-orca 逐项开发 <需求>
 
 ### Tier Profile 窗口
 
-每次的模型 tier 不同，不用再手打 `provider:model:effort`。Skill 会在第一次需要时打开一个交互式
-Tier Profile 窗口，也可以随时通过 `$t3-orca 配置`、`$t3-orca 设置`、`$t3-orca setup`（或当宿主将其路由到本 skill 时的 `/t3-orca 配置` / `/t3-orca 设置` / `/t3-orca setup`）以及 `打开 tier 窗口` 直接打开配置页，无需先触发委派或预设，也不会被已有的 `tiers.yaml` 拦截：
+配置按项目保存：每个项目一份 `.t3-orca/tiers.yaml`，不读也不写全局配置。首次执行时打开交互式
+Tier Profile 窗口；保存后，后续执行直接复用项目配置，不再询问。也可以随时通过 `$t3-orca 配置`、`$t3-orca 设置`、`$t3-orca setup`（或当宿主将其路由到本 skill 时的 `/t3-orca 配置` / `/t3-orca 设置` / `/t3-orca setup`）以及 `打开 tier 窗口` 直接打开配置页；已存在的项目配置会被预载：
 
 [assets/tier-profile.html](assets/tier-profile.html)
 
-窗口由模板生成，T3 Code 里由 `html_preview` / `html_render` 直接渲染，也可以双击用浏览器打开。生成时会自动注入 `orchestrator_capabilities` 的 live 目录，所以 provider / model 下拉直接来自当前 T3 Code 环境，不需要手动粘贴。功能：
+窗口由模板生成。T3 Code 里优先用 `preview_open` 打开桥接页面，用户点一次 **保存到项目** 就能直接写入 `.t3-orca/tiers.yaml`；`html_preview` / `html_render` 作为复制/下载回退路径。生成时会自动注入 `orchestrator_capabilities` 的 live 目录，所以 provider / model 下拉直接来自当前 T3 Code 环境，不需要手动粘贴。功能：
 
 - 四个默认 tier（`ui`、`code`、`fast`、`review`），可增删、改名、改 role。
 - 每个 tier 可选：指定模型、复用另一个 tier、父线程 Review、继承父线程。
 - provider / model / 强度下拉；支持 `sol6.1`、`deepseek-flash-claude`、`opus` 等别名一键填充。
 - 自动载入 T3 Code live capabilities，并按 live 目录校验 provider、model 和选项值；右上角显示 `T3 Code · N providers`。
+- 有项目配置时自动预载，右上角显示 `已载入项目配置`；没有配置时从默认表新建。
+- 通过可选的本地桥接直接保存到项目；桥接不可达时显示 `本地桥接不可用`，改用复制或下载。
 - 需要手动覆盖时，可在窗口内粘贴 JSON 或选择 capabilities 文件。
 - 实时生成可复制的 `tiers:` 块；`仅输出改动` 模式只写与默认不同的 tier。
-- 保存常用预设（浏览器 localStorage），下次打开自动恢复上次编辑（预览框本身不会写入本地磁盘文件）。
+- 保存常用预设（浏览器 localStorage）；T3 inline 预览是沙箱 iframe，localStorage 通常不可用。桥接页面（`preview_open`）可直接保存；inline 回退需复制或下载。
 
 打开流程：Skill 先调用 `orchestrator_capabilities`，把结果写入临时 JSON，在任意目录运行绝对路径脚本
-`node <skill-dir>/scripts/build-tier-profile.mjs <capabilities.json> [out.html]`（省略 `out.html` 时默认写入安全的临时目录并输出路径，不改动目标项目文件），再用 `html_preview` / `html_render` 预览生成的 HTML。
+`node <skill-dir>/scripts/build-tier-profile.mjs [--profile <project>/.t3-orca/tiers.yaml] <capabilities.json> [out.html]`（有项目配置时加 `--profile` 预载；省略 `out.html` 时默认写入安全的临时目录并输出路径，不改动目标项目文件）。
+然后启动 `node <skill-dir>/scripts/tier-profile-bridge.mjs --project <config-base> --page <out.html> --ready-file <tmp>/ready.json`，保持长会话；用 `preview_open` 的 `environment-port` 打开返回的 `pageRoute`。**不要用 `html_render` 打开桥接页面**：T3 的 HTML 渲染器走 SOCKS 代理并拒绝 loopback，会显示 `本地桥接不可用`。
 如果窗口右上角显示 `内置预填目录` 而不是 `T3 Code · N providers`，说明注入失败，可在
 Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用时，直接打开原始模板 `assets/tier-profile.html`；预览工具不可用时，给出文件绝对路径用浏览器打开。
 说 `刷新 tier 窗口` 时会重新调用 `orchestrator_capabilities` 并重建窗口。
 
-返回方式二选一：
+保存方式：
 
-- 复制生成的 YAML，粘贴回聊天；
-- 下载 `tiers.yaml`，放到项目根目录的 `.t3-orca/tiers.yaml`（项目级复用）或 `~/.config/t3-orca/tiers.yaml`（全局复用）。
+- 首选：在 `preview_open` 页面点 **保存到项目**，桥接直接写入项目配置；
+- 回退：复制生成的 YAML 粘贴回聊天，或下载 `tiers.yaml`，由 agent 用 `save-tier-profile.mjs` 落盘。
 
-Skill 收到后仍会用 live capabilities 校验，并只复述一次最终 profile。也支持直接说
+桥接保存后 Skill 直接读取并校验；如果收到 YAML 或下载文件，则通过
+`node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` 写入 `.t3-orca/tiers.yaml`，并只复述一次最终 profile。也支持直接说
 “code 用 cursor opus max”，或直接在消息开头贴简写：
 
 ```yaml
@@ -92,7 +96,7 @@ tiers:
   review: parent
 ```
 
-- 没贴 profile 且没有配置文件时，才打开窗口；不会每个 item 追问。
+- 没有全局配置；执行时只查项目配置。没贴 profile 且项目没有 `.t3-orca/tiers.yaml` 时才打开窗口；保存后不再追问，也不会每个 item 追问。
 - 格式支持 `sol6.1 @ high`、`provider:model @ key=value`、`fast: code @ low` 复用、`inherit`、`default` 和展开写法。
 - 模板在 [assets/tier-profile.template.yaml](assets/tier-profile.template.yaml)。
 
@@ -140,7 +144,7 @@ $t3-orca review 循环 <scope>
 流程：
 
 1. 父线程先实现（如果改动还不存在），并跑一遍测试 / 构建确认基线。
-2. 每轮新起一个只读 review 子代理，目标来自和 `逐项开发` 同一份 tier profile 的 `review` tier，解析顺序也相同（inline `tiers:` > 项目 `.t3-orca/tiers.yaml` > 全局配置 > 预设默认）。review 循环的预设默认是 `sol6.1 @ low`（`codex` / `gpt-6.1-sol`，`reasoningEffort: low`）。Brief 包含 repo 路径、base SHA、diff 命令、验收标准、测试结果和上一轮 findings。
+2. 每轮新起一个只读 review 子代理，目标来自和 `逐项开发` 同一份 tier profile 的 `review` tier，解析顺序也相同（inline `tiers:` > 项目 `.t3-orca/tiers.yaml` > 没有项目配置时打开窗口并预填预设默认）。review 循环的预设默认是 `sol6.1 @ low`（`codex` / `gpt-6.1-sol`，`reasoningEffort: low`）。Brief 包含 repo 路径、base SHA、diff 命令、验收标准、测试结果和上一轮 findings。
 3. 父线程 triage：实质问题自己修复并验证；误报用代码证据驳回；纯风格建议忽略，不改代码、不占轮次。
 4. 修复后重跑测试，再新起一轮 review。不复用上一轮 reviewer，也不把修复交给 reviewer。
 5. 某一轮没有实质问题且验证通过即完成。第 5 轮仍有实质问题就停下，汇报阻塞原因，不提交。
@@ -150,7 +154,7 @@ $t3-orca review 循环 <scope>
 
 - reviewer 只读：不改文件、不 stage/commit/push、不跑有状态命令、不起子代理；父线程负责修复和验证。
 - reviewer 用 `isolation: "shared"`，必须看到父线程未提交的修复；`worktree` 会漏掉这些改动。
-- reviewer 目标就是 tier profile 的 `review` tier，和 `逐项开发` 用同一套解析；优先级：当前消息显式指定 > profile 的 `review` > 预设默认 `sol6.1 @ low`。`review: parent` 是逐项开发的值，在 review 循环里视为未设置，绝不改成父线程自审。
+- reviewer 目标就是项目 profile 的 `review` tier，和 `逐项开发` 用同一套解析；优先级：当前消息显式指定 > 项目 `.t3-orca/tiers.yaml` 的 `review` > 没有项目配置时打开窗口（预填 `sol6.1 @ low`）。`review: parent` 是逐项开发的值，在 review 循环里视为未设置，绝不改成父线程自审。
 - 5 轮未通过时报告：未解决的 findings、每轮做了什么、为什么卡住、下一步选项；不静默加轮次。
 - reviewer 目标不可用时报告 substitution，不静默换模型。
 
@@ -173,7 +177,9 @@ t3-orca/
 |   |-- tier-profile.html
 |   `-- tier-profile.template.yaml
 |-- scripts/
-|   `-- build-tier-profile.mjs
+|   |-- build-tier-profile.mjs
+|   |-- save-tier-profile.mjs
+|   `-- tier-profile-bridge.mjs
 |-- references/
 |   |-- orchestrator-v2.md
 |   |-- routing.md
@@ -190,6 +196,8 @@ t3-orca/
 - `references/routing.md`：能力信号、候选评分和路由示例。
 - `references/tiered-delivery.md`：逐项开发预设的 tier 解析、Review 循环、5 轮上限和逐项提交规则。
 - `references/review-loop.md`：只读 Review 循环预设的 reviewer 解析、read-only 契约、父线程修复验证、triage、5 轮上限和阻塞报告。
-- `references/tier-profile.md`：Tier Profile 窗口、每次会话的 `tiers:` 覆盖、配置优先级和校验规则。
+- `references/tier-profile.md`：项目级 `.t3-orca/tiers.yaml`、Tier Profile 窗口预载、保存和校验规则。
 - `scripts/build-tier-profile.mjs`：把 `orchestrator_capabilities` 注入 Tier Profile 窗口，生成临时 HTML。
+- `scripts/save-tier-profile.mjs`：把窗口生成的 YAML 原子写入 `<project>/.t3-orca/tiers.yaml`。
+- `scripts/tier-profile-bridge.mjs`：临时 loopback 桥接，服务配置页并让 **保存到项目** 直接原子写入项目配置。
 - `references/patterns.md`：fan-out、pipeline、review loop、worktree、escalation 和 brief 模板。
