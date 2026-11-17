@@ -159,12 +159,21 @@ When the project has no usable profile — or whenever the user explicitly asks 
    ```
 
    The page opens in the T3 preview browser with `已载入项目配置` (when built with `--profile`) or `新建配置`. The user edits the tiers and clicks **保存到项目**; the bridge writes the YAML atomically and the page shows `已保存到 <path>`.
+
+   **Phone viewport:** The preview is a streamed remote browser; the phone's screen width does not automatically become the page's CSS viewport. After `preview_open`, use its returned `tabId` with `preview_resize` before telling the user the page is ready. When the user is on a phone, reports a tiny desktop page, or the client size is unknown, use this compact default:
+
+   ```json
+   { "tabId": "<returned tabId>", "mode": "freeform", "width": 390, "height": 844 }
+   ```
+
+   If the user explicitly uses desktop, use `mode: "fill"` instead. Verify the resize result's `viewport.width` is at most 560 for phone setup (use `preview_status` if omitted). If resizing fails, report it and offer the copy/download or chat fallback; do not claim mobile adaptation succeeded. Keep the setup tab open for the user. CSS media queries and `<meta name="viewport">` alone cannot fix a desktop-sized streamed viewport.
+
 6. Do **not** use `html_render` for the bridge-served page. T3's HTML renderer runs headless Chrome with a SOCKS proxy (`--proxy-bypass-list=<-loopback>`) that refuses loopback/private targets, so the page shows `本地桥接不可用`. Use `html_render` only for the copy/download fallback below.
 7. Tell the user to reply when the page says saved. Then read `<config-base>/.t3-orca/tiers.yaml`, validate every target against the live capabilities, stop the bridge (`kill <pid>`), and restate the profile once.
 
 Fallback when the bridge cannot start, `preview_open` is unavailable, or the page cannot reach the bridge:
 
-1. Call `html_preview` with the file `page` path and `width: 1180`.
+1. Call `html_preview` with the file `page` path and `width: 390` for phone/unknown clients (`1180` only for explicit desktop use).
 2. Call `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height` (cap 2000).
 3. Ask the user to copy the generated YAML back or download `tiers.yaml`.
 4. Save with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs) (YAML on stdin), or move the downloaded file to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.

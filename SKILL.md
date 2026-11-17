@@ -115,9 +115,18 @@ test -f "$config" && echo "exists: $config" || echo "missing: $config"
    ```
 
    This is the preferred path in T3 Code. Do **not** use `html_render` for the bridge page: T3's HTML renderer runs through a SOCKS proxy that blocks loopback, so the save button would show `本地桥接不可用`. With `--profile`, the page shows `已载入项目配置`; without it, it starts from the default table.
+
+   **Phone viewport:** The preview is a streamed remote browser; the phone's screen width does not automatically become the page's CSS viewport. After `preview_open`, use its returned `tabId` with `preview_resize` before telling the user the page is ready. When the user is on a phone, reports a tiny desktop page, or the client size is unknown, use this compact default:
+
+   ```json
+   { "tabId": "<returned tabId>", "mode": "freeform", "width": 390, "height": 844 }
+   ```
+
+   If the user explicitly uses desktop, use `mode: "fill"` instead. Verify the resize result's `viewport.width` is at most 560 for phone setup (use `preview_status` if omitted). If resizing fails, report it and offer the copy/download or chat fallback; do not claim mobile adaptation succeeded. Keep the setup tab open for the user. CSS media queries and `<meta name="viewport">` alone cannot fix a desktop-sized streamed viewport.
+
 6. Say one line: edit the tiers, then click **保存到项目**. The page writes the YAML through the bridge and shows `已保存到 <path>`. Ask the user to reply when it is saved. If the user asks to refresh the catalog, stop the bridge, call `orchestrator_capabilities` again, rebuild, and restart the bridge.
 7. When the user confirms, read `<config-base>/.t3-orca/tiers.yaml`, validate every target against `orchestrator_capabilities`, stop the bridge (`kill <pid>`), restate the profile once in compact form, and use it for the project. Do not ask again per item.
-8. Fallback if the bridge cannot start, `preview_open` is unavailable, or the page shows `本地桥接不可用`: call `html_preview` with the file `page` path and `width: 1180`, then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height`. Ask the user to copy the YAML back or download it, then save it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` (YAML on stdin). If they downloaded `tiers.yaml`, move or copy it to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.
+8. Fallback if the bridge cannot start, `preview_open` is unavailable, or the page shows `本地桥接不可用`: call `html_preview` with the file `page` path and `width: 390` for phone/unknown clients (`1180` only for explicit desktop use), then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height`. Ask the user to copy the YAML back or download it, then save it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` (YAML on stdin). If they downloaded `tiers.yaml`, move or copy it to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.
 
 If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, or the frame is not interactive, give the user the absolute file path to open in a browser.
 

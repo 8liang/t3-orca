@@ -684,7 +684,13 @@
   @media (max-width: 560px) {
     .app { padding-top: 4px; }
     .topbar { flex-wrap: wrap; }
-    .top-actions { width: 100%; margin-left: 0; }
+    .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; }
+    button, select, input, textarea { font-size: 16px; }
+    .btn, .seg button, .field select, .field input, .preset select,
+    .save-row input, .icon-btn { min-height: 44px; }
+    .icon-btn { min-width: 44px; }
+    .save-row { flex-wrap: wrap; }
+    .save-row input { min-width: 0; }
     .fields { grid-template-columns: 1fr; }
     .card-foot { flex-wrap: wrap; }
     .card-foot .field { width: 100%; }
