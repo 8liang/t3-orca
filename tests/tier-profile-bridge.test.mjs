@@ -85,6 +85,7 @@ test("starts on loopback, injects the bridge config, and writes the project prof
     const payload = await saved.json();
     assert.deepEqual(payload, { ok: true, path: bridge.target });
     assert.equal(readFileSync(bridge.target, "utf8"), body);
+    assert.equal(readFileSync(join(realpathSync(project), ".gitignore"), "utf8"), ".t3-orca/\n");
   } finally {
     started?.bridge.close();
     rmSync(dir, { recursive: true, force: true });
@@ -96,7 +97,7 @@ test("rejects a missing or wrong token and invalid YAML without touching the fil
   let started;
   try {
     started = await start(dir);
-    const { bridge } = started;
+    const { bridge, project } = started;
 
     const noToken = await fetch(bridge.healthUrl);
     assert.equal(noToken.status, 403);
@@ -120,6 +121,7 @@ test("rejects a missing or wrong token and invalid YAML without touching the fil
     assert.match((await badYaml.json()).error, /top-level "tiers:"/);
 
     assert.equal(existsSync(bridge.target), false);
+    assert.equal(existsSync(join(realpathSync(project), ".gitignore")), false);
   } finally {
     started?.bridge.close();
     rmSync(dir, { recursive: true, force: true });

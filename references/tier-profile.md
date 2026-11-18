@@ -238,10 +238,10 @@ When leaving the page for chat, stop the setup bridge when it is no longer neede
   YAML
   ```
 
-  Feed the YAML on stdin. The helper creates `.t3-orca/`, writes atomically, and refuses a `.t3-orca` directory that resolves outside the project. It prints the target path.
+  Feed the YAML on stdin. The helper creates `.t3-orca/`, writes atomically, automatically ensures `.t3-orca/` is listed in the project's `.gitignore`, and refuses a `.t3-orca` directory (or `.gitignore` symlink) that resolves outside the project. It prints the target path.
 - Stop the bridge after the file is saved (`kill <pid>`); do not leave the loopback server running.
 - For an explicit `setup` request, the returned YAML is the user's confirmation; replacing the existing project config is expected. For a first run, create it. If the user cancels, leave the existing file unchanged.
-- If the user downloaded `tiers.yaml` instead of pasting it, move or copy that file to `<project>/.t3-orca/tiers.yaml` after confirming the path.
+- If the user downloaded `tiers.yaml` instead of pasting it, move or copy that file to `<project>/.t3-orca/tiers.yaml` after confirming the path and ensure `.t3-orca/` is added to `.gitignore`.
 - Restate the accepted profile once in compact form.
 - If the user only changed a few rows, keep the remaining tiers from the base profile; the window's `仅输出改动` mode emits exactly that overlay.
 - Do not reopen the window or ask again for the same project unless the user asks to change tiers or the file is missing.
@@ -281,7 +281,7 @@ If the profile names a provider that was not in the last capability payload, cal
 ## Saving
 
 - **In-conversation tier/model assignment (no `setup` intent):** Keep the overlay in memory for the current conversation and its sub-conversations only; **never write or modify `.t3-orca/tiers.yaml`**.
-- **Setup intent / project profile:** Write `<project>/.t3-orca/tiers.yaml` with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs) (or via the loopback bridge's **保存到项目** button). The helper creates `.t3-orca/`, writes atomically, and refuses paths outside the project.
+- **Setup intent / project profile:** Write `<project>/.t3-orca/tiers.yaml` with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs) (or via the loopback bridge's **保存到项目** button). The helper creates `.t3-orca/`, writes atomically, automatically ensures `.t3-orca/` is added to `<project>/.gitignore` (unless an ancestor repo `.gitignore` already ignores it), and refuses paths outside the project.
 - There is no global config. Do not write `~/.config/t3-orca/tiers.yaml`.
 - For a first-time setup, write the returned YAML directly. For an explicit `setup`/edit of an existing profile (including mid-conversation requests to update or save `.t3-orca/tiers.yaml`), the returned/confirmed YAML authorizes replacing it. Whenever the user did not express `setup` intent, leave `.t3-orca/tiers.yaml` untouched.
 

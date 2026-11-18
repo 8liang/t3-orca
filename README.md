@@ -86,11 +86,11 @@ Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用
 
 保存方式（仅限 setup / 首次配置）：
 
-- 首选：在 `preview_open` 页面点 **保存到项目**，桥接直接写入项目配置；
-- 回退：在 setup 流程中复制生成的 YAML 粘贴回聊天，或下载 `tiers.yaml`，由 agent 用 `save-tier-profile.mjs` 落盘。
+- 首选：在 `preview_open` 页面点 **保存到项目**，桥接直接写入项目配置，并自动将 `.t3-orca/` 加入项目 `.gitignore`；
+- 回退：在 setup 流程中复制生成的 YAML 粘贴回聊天，或下载 `tiers.yaml`，由 agent 用 `save-tier-profile.mjs` 落盘（同样会自动将 `.t3-orca/` 加入项目 `.gitignore`）。
 
 仅在 setup / 首次配置时，桥接保存后 Skill 直接读取并校验，或收到 setup YAML / 下载文件后通过
-`node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` 写入 `.t3-orca/tiers.yaml`，并只复述一次最终 profile。日常对话中未表达 setup 意图时，直接说“code 用 cursor opus max”或在消息里贴简写 `tiers:`：
+`node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` 写入 `.t3-orca/tiers.yaml`（并自动确保 `.t3-orca/` 在 `.gitignore` 中），只复述一次最终 profile。日常对话中未表达 setup 意图时，直接说“code 用 cursor opus max”或在消息里贴简写 `tiers:`：
 
 ```yaml
 tiers:

@@ -4,7 +4,7 @@
 //   node <skill-dir>/scripts/save-tier-profile.mjs [--project <dir>] < tiers.yaml
 // The file is always written to <project>/.t3-orca/tiers.yaml.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,20 @@ export function resolveProjectRoot(cwd = process.cwd()) {
   return realpathSync(cwd);
 }
 
+function findGitRoot(cwd) {
+  try {
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (root) return realpathSync(root);
+  } catch {
+    // Not inside a git repository.
+  }
+  return null;
+}
+
 export function validateProfileText(text) {
   const value = String(text == null ? "" : text).replace(/^\uFEFF/, "");
   if (!value.trim()) throw new Error("Profile input is empty.");
@@ -43,6 +57,100 @@ export function validateProfileText(text) {
 function isWithin(root, target) {
   const rel = relative(root, target);
   return rel === "" || (!rel.startsWith(".." + sep) && rel !== ".." && !isAbsolute(rel));
+}
+
+function writeAtomic(target, content) {
+  const temp = join(dirname(target), `.tmp-${process.pid}-${Date.now()}`);
+  try {
+    writeFileSync(temp, content, "utf8");
+    try {
+      renameSync(temp, target);
+    } catch {
+      rmSync(target, { force: true });
+      renameSync(temp, target);
+    }
+  } finally {
+    rmSync(temp, { force: true });
+  }
+}
+
+export function hasGitignoreEntry(content, { allowAnchored = true } = {}) {
+  const unanchoredIgnore = new Set([
+    ".t3-orca",
+    ".t3-orca/",
+    ".t3-orca/*",
+    ".t3-orca/**",
+    "**/.t3-orca",
+    "**/.t3-orca/",
+    "**/.t3-orca/*",
+    "**/.t3-orca/**",
+  ]);
+  const anchoredIgnore = new Set([
+    "/.t3-orca",
+    "/.t3-orca/",
+    "/.t3-orca/*",
+    "/.t3-orca/**",
+  ]);
+  const unanchoredNegate = new Set(["!.t3-orca", "!.t3-orca/", "!**/.t3-orca", "!**/.t3-orca/"]);
+  const anchoredNegate = new Set(["!/.t3-orca", "!/.t3-orca/"]);
+
+  let ignored = false;
+  for (const rawLine of String(content || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (unanchoredIgnore.has(line) || (allowAnchored && anchoredIgnore.has(line))) {
+      ignored = true;
+    } else if (unanchoredNegate.has(line) || (allowAnchored && anchoredNegate.has(line))) {
+      ignored = false;
+    }
+  }
+  return ignored;
+}
+
+export function ensureGitignore({ project, cwd = process.cwd() } = {}) {
+  const requestedRoot = project ? resolve(cwd, project) : resolveProjectRoot(cwd);
+  if (!existsSync(requestedRoot) || !statSync(requestedRoot).isDirectory()) {
+    throw new Error(`Project directory does not exist: ${requestedRoot}`);
+  }
+  const projectRoot = realpathSync(requestedRoot);
+
+  const gitRoot = findGitRoot(projectRoot);
+  if (gitRoot && gitRoot !== projectRoot) {
+    const rootGitignore = join(gitRoot, ".gitignore");
+    if (existsSync(rootGitignore)) {
+      const rootContent = readFileSync(rootGitignore, "utf8");
+      if (hasGitignoreEntry(rootContent, { allowAnchored: false })) {
+        return { path: rootGitignore, updated: false };
+      }
+    }
+  }
+
+  const gitignorePath = join(projectRoot, ".gitignore");
+  const entryStat = lstatSync(gitignorePath, { throwIfNoEntry: false });
+  if (entryStat) {
+    if (!existsSync(gitignorePath)) {
+      throw new Error(`Refusing to write broken symlink outside the project: ${gitignorePath}`);
+    }
+    const resolvedGitignore = realpathSync(gitignorePath);
+    if (!isWithin(projectRoot, resolvedGitignore)) {
+      throw new Error(`Refusing to write outside the project: ${resolvedGitignore}`);
+    }
+  }
+
+  const existing = entryStat ? readFileSync(gitignorePath, "utf8") : "";
+  if (hasGitignoreEntry(existing, { allowAnchored: true })) {
+    return { path: gitignorePath, updated: false };
+  }
+
+  const eol = existing.includes("\r\n") ? "\r\n" : "\n";
+  const prefix =
+    existing.length === 0
+      ? ""
+      : existing.endsWith("\n") || existing.endsWith("\r")
+        ? existing
+        : existing + eol;
+  writeAtomic(gitignorePath, `${prefix}.t3-orca/${eol}`);
+  return { path: gitignorePath, updated: true };
 }
 
 export function resolveTierProfileTarget({ project, cwd = process.cwd() }) {
@@ -63,20 +171,10 @@ export function resolveTierProfileTarget({ project, cwd = process.cwd() }) {
 }
 
 export function saveTierProfile({ project, text, cwd = process.cwd() }) {
-  const target = resolveTierProfileTarget({ project, cwd });
   const content = validateProfileText(text);
-  const temp = join(dirname(target), `.tiers.yaml.tmp-${process.pid}-${Date.now()}`);
-  try {
-    writeFileSync(temp, content, "utf8");
-    try {
-      renameSync(temp, target);
-    } catch {
-      rmSync(target, { force: true });
-      renameSync(temp, target);
-    }
-  } finally {
-    rmSync(temp, { force: true });
-  }
+  const target = resolveTierProfileTarget({ project, cwd });
+  ensureGitignore({ project, cwd });
+  writeAtomic(target, content);
   return target;
 }
 
