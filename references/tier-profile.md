@@ -6,13 +6,13 @@ There is no global profile. A profile belongs to the project that contains it, s
 
 ## Resolution order
 
-1. Inline `tiers:` block in the current message.
-2. Nearest `.t3-orca/tiers.yaml` from the current directory up to the project root.
-3. No project profile: open the Tier Profile window once (or use the chat fallback below), then save the result to the project.
+1. **Conversation start — load project defaults:** Resolve the project root and look for the nearest `.t3-orca/tiers.yaml` from the current directory up to the project root. When found, read it as the default tier profile for this conversation (any omitted tiers fall back to the preset default table).
+2. **In-conversation tier assignments — current conversation & sub-conversations only:** Inline `tiers:` blocks or natural-language tier assignments (for example, "code 用 opus max" or "用 sol6.1 做 review") without `setup` intent overlay onto the conversation's loaded defaults in memory. They apply **only to the current conversation and its sub-conversations/child tasks**; never modify `.t3-orca/tiers.yaml` and never affect other sessions in the same project.
+3. **Setup intent or missing project profile:** If the user expresses `setup` intent (`setup`, `配置`, `设置`, `打开 tier 窗口`, or explicitly asks to update/save `.t3-orca/tiers.yaml`), or if no `.t3-orca/tiers.yaml` exists and no session override covers the needed tiers, open the Tier Profile window once (or use the chat fallback below), and save the confirmed result to `<project>/.t3-orca/tiers.yaml`.
 
-The project root is the git root of the working directory, or the working directory itself outside a git repository. Do not read `~/.config/t3-orca/tiers.yaml` and do not silently fall back to the default table: a run without a project profile must configure one first.
+The project root is the git root of the working directory, or the working directory itself outside a git repository. Do not read `~/.config/t3-orca/tiers.yaml` and do not silently fall back to the default table when no project profile and no session override exist.
 
-Inline wins for that run only and is not saved automatically. Do not reuse another project's profile unless the user explicitly copies it.
+Do not reuse another project's profile unless the user explicitly copies it.
 
 ## Compact form
 
@@ -168,6 +168,10 @@ When the project has no usable profile — or whenever the user explicitly asks 
 
    If the user explicitly uses desktop, use `mode: "fill"` instead. Verify the resize result's `viewport.width` is at most 560 for phone setup (use `preview_status` if omitted). If resizing fails, report it and offer the copy/download or chat fallback; do not claim mobile adaptation succeeded. Keep the setup tab open for the user. CSS media queries and `<meta name="viewport">` alone cannot fix a desktop-sized streamed viewport.
 
+   **Phone interaction failure:** A successful resize proves layout size only, not that the user's client can operate the streamed browser. If the user reports “像截图”, “点不了”, or “不能操作”, use the [chat fallback](#chat-fallback) immediately: show the current project's compact `tiers:` block and accept either the full YAML or changed lines. If there is no project profile, show the preset defaults as editable suggestions. Check `preview_status` only to report observed state; `owner: agent` does not prove why touch input fails. Offer a control handoff only when an available tool explicitly supports it. Do not invent a handoff API or claim control was transferred. Do not repeatedly resize, reopen, or switch to `html_render` as a presumed interaction fix. An inline form may be tried once if the user requests it, but chat remains available without operating any page.
+
+   Do not send a phone a `localhost`, `127.0.0.1`, or local filesystem URL as a working remote-browser link. Do not expose the save bridge on a public or LAN interface to work around this. The existing loopback bridge remains local.
+
 6. Do **not** use `html_render` for the bridge-served page. T3's HTML renderer runs headless Chrome with a SOCKS proxy (`--proxy-bypass-list=<-loopback>`) that refuses loopback/private targets, so the page shows `本地桥接不可用`. Use `html_render` only for the copy/download fallback below.
 7. Tell the user to reply when the page says saved. Then read `<config-base>/.t3-orca/tiers.yaml`, validate every target against the live capabilities, stop the bridge (`kill <pid>`), and restate the profile once.
 
@@ -196,13 +200,13 @@ Do not paste the HTML source into the thread. Do not also dump a long provider/m
 
 The injected catalog is live. The page badge shows `T3 Code · N providers` when injection succeeded. If it shows `内置预填目录`, injection failed or the raw template was opened; use the Capabilities panel to paste the JSON manually, or rerun the helper.
 
-If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use the manual Capabilities panel. If `html_preview` or `html_render` is unavailable, or the embedded frame is not interactive, give the user the absolute file path link and ask them to open it in a browser. The page works the same way.
+If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use the manual Capabilities panel. If `html_preview` or `html_render` is unavailable, give desktop users the absolute file path link to open locally. For a non-interactive frame or a phone without access to that filesystem, use the chat fallback instead.
 
 Never present the seed catalog as live truth.
 
 ### Chat fallback
 
-If no window can be shown, ask once in one normal chat message, not as a secret card. It is configuration, not a credential.
+If no usable window can be shown, including a phone showing only a non-interactive preview, ask once in normal chat, not as a secret card. It is configuration, not a credential. Use the current project profile as the base; only use preset defaults when no profile exists.
 
 ```text
 Tier profile (edit only what differs; add or remove tiers as needed):
@@ -217,6 +221,10 @@ Reply with the full block or only the lines you changed. I will validate the
 targets against the live capabilities, save the result to the project's
 `.t3-orca/tiers.yaml`, and use it for this project.
 ```
+
+A YAML reply during explicit setup confirms saving the project profile, including when the copied block also contains `$t3-orca 逐项开发`. Do not treat this setup response as an inline-only run override. Validate the returned targets, merge changed lines into the preloaded profile, save using `save-tier-profile.mjs`, and read back the saved file. With no accompanying development request, ask for the task instead of launching delegates or repeating completed work.
+
+When leaving the page for chat, stop the setup bridge when it is no longer needed. A PTY reporting an unknown/exited session is not a configuration failure: check only the recorded bridge process, confirm it has exited, and continue saving and validating. Do not kill unrelated Node processes.
 
 ### After the window
 
@@ -238,19 +246,20 @@ targets against the live capabilities, save the result to the project's
 - If the user only changed a few rows, keep the remaining tiers from the base profile; the window's `仅输出改动` mode emits exactly that overlay.
 - Do not reopen the window or ask again for the same project unless the user asks to change tiers or the file is missing.
 
-## Partial replies
+## Partial replies and conversation overrides
 
-- A full `tiers:` block replaces the current profile.
-- A partial block overlays the default or last accepted profile.
+- A full `tiers:` block replaces the active profile (in-memory for the current conversation & children by default, or saved to `.t3-orca/tiers.yaml` only during `setup`).
+- A partial block overlays the conversation's base profile (loaded from `.t3-orca/tiers.yaml` at conversation start, or defaults when absent).
 - A single line such as `code: cursor:claude-opus-5-5 @ effort=max` changes only that tier.
-- `tier: default` resets that tier to the default profile.
+- `tier: default` resets that tier to the project `.t3-orca/tiers.yaml` value (or default table if absent).
 - `tier: inherit` sets that tier to the parent provider/model/options.
 
-After accepting and saving a profile, restate it once in compact form and use it for the rest of the project. Do not ask again unless the user changes it or the file is missing.
+Natural-language tier assignments in conversation are allowed. Map them to the compact form, restate the result once, and proceed. For example, `code 用 cursor opus max` becomes `code: cursor:claude-opus-5-5 @ effort=max`.
 
-Natural-language overrides are allowed. Map them to the compact form, restate the result once, and proceed. For example, `code 用 cursor opus max` becomes `code: cursor:claude-opus-5-5 @ effort=max`.
+- **Without `setup` intent (default in conversation):** Treat inline `tiers:` and natural-language tier/model assignments as **conversation-scoped overrides** for **this conversation and its sub-conversations/child tasks only**. Do **not** modify `.t3-orca/tiers.yaml` and do **not** affect other sessions in the same project. When spawning `delegate_task` children, resolve their `target` from this effective conversation profile; if a child is explicitly authorized to sub-delegate, pass the effective `tiers:` in its brief and instruct it not to overwrite it with disk `.t3-orca/tiers.yaml` and not to edit `.t3-orca/tiers.yaml`.
+- **With `setup` intent (or during pending setup):** Validate and persist the merged profile to `<project>/.t3-orca/tiers.yaml` via `save-tier-profile.mjs` (or the bridge button), restate it once in compact form, and also refresh the current conversation's defaults.
 
-`reset tiers` or `use default tiers` resets the in-memory profile to the default table. It does not delete the project file until the user saves the reset.
+`reset tiers` or `use default tiers` clears the conversation's in-memory overrides back to `<project>/.t3-orca/tiers.yaml` (or the default table if no project file exists). It does not modify or delete `.t3-orca/tiers.yaml`.
 
 ## Validation
 
@@ -271,10 +280,10 @@ If the profile names a provider that was not in the last capability payload, cal
 
 ## Saving
 
-- Inline only: use the profile for this run; do not write a file.
-- Project profile: write `<project>/.t3-orca/tiers.yaml` with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs). The helper creates `.t3-orca/`, writes atomically, and refuses paths outside the project.
+- **In-conversation tier/model assignment (no `setup` intent):** Keep the overlay in memory for the current conversation and its sub-conversations only; **never write or modify `.t3-orca/tiers.yaml`**.
+- **Setup intent / project profile:** Write `<project>/.t3-orca/tiers.yaml` with [`scripts/save-tier-profile.mjs`](../scripts/save-tier-profile.mjs) (or via the loopback bridge's **保存到项目** button). The helper creates `.t3-orca/`, writes atomically, and refuses paths outside the project.
 - There is no global config. Do not write `~/.config/t3-orca/tiers.yaml`.
-- For a first-time setup, write the returned YAML directly. For an explicit `setup`/edit of an existing profile, the returned YAML is the confirmation to replace it. In any other case where the user did not ask to change an existing file, show the proposed content and ask before replacing.
+- For a first-time setup, write the returned YAML directly. For an explicit `setup`/edit of an existing profile (including mid-conversation requests to update or save `.t3-orca/tiers.yaml`), the returned/confirmed YAML authorizes replacing it. Whenever the user did not express `setup` intent, leave `.t3-orca/tiers.yaml` untouched.
 
 The template is in [assets/tier-profile.template.yaml](../assets/tier-profile.template.yaml).
 

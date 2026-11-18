@@ -23,9 +23,9 @@ Invoking this preset authorizes a reported fallback when a tier target is unavai
 
 ## Tier profile
 
-The table below is the default profile used to prefill the setup page. A run resolves an inline `tiers:` block first, then the project's `.t3-orca/tiers.yaml`. There is no global profile.
+The table below is the default profile used to prefill the setup page. At conversation start in a project, read the nearest `.t3-orca/tiers.yaml` as the conversation's default tier profile (there is no global profile). An inline `tiers:` block or conversational tier assignment ("use X for Y tier") without `setup` intent overlays on top of those defaults **for the current conversation and its sub-conversations/child threads only**, without modifying `.t3-orca/tiers.yaml` or affecting other sessions in the same project.
 
-If the project has no profile, open the Tier Profile window once, let the user choose, and save the generated YAML to `<project>/.t3-orca/tiers.yaml` before delegating. Do not silently use the default table, do not ask for provider/model/effort per item, and do not reuse another project's profile. See [tier-profile.md](tier-profile.md).
+If the project has no `.t3-orca/tiers.yaml` and no session override covers the needed tiers (or when the user expresses `setup` intent), open the Tier Profile window once, let the user choose, and save the generated YAML to `<project>/.t3-orca/tiers.yaml` before delegating. Do not silently use the default table, do not ask for provider/model/effort per item, and do not reuse another project's profile. See [tier-profile.md](tier-profile.md).
 
 Profiles can use friendly aliases such as `ui: sol6.1 @ high` and `code: deepseek-flash-claude @ high`; see [tier-profile.md](tier-profile.md) for the grammar and validation rules.
 
@@ -58,7 +58,7 @@ Classify each item by its dominant capability:
 
 ## Resolution algorithm
 
-1. Call `orchestrator_capabilities` once for the thread. Resolve the tier profile: inline `tiers:`, then project `.t3-orca/tiers.yaml`. If neither is present, open the Tier Profile window once as described in [tier-profile.md](tier-profile.md), prefilled with the default table, and save the result to the project. Do not ask per item.
+1. Call `orchestrator_capabilities` once for the thread. Load the project's nearest `.t3-orca/tiers.yaml` as the conversation's defaults (if present), then apply any inline `tiers:` or conversational tier overrides in memory for this conversation and its child threads without modifying `.t3-orca/tiers.yaml`. If neither `.t3-orca/tiers.yaml` nor a covering session override exists, open the Tier Profile window once as described in [tier-profile.md](tier-profile.md), prefilled with the default table, and save the result to the project. Do not ask per item.
 2. Find the exact preferred target by `providerInstanceId` and model `id`.
 3. Reject the provider/model if `canRunChildTask` is false, `constraints` is non-empty, or the model is absent. If only a preferred option value is invalid, keep the model and handle it in step 5.
 4. If the exact target is unavailable, score eligible fallbacks:

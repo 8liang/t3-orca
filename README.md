@@ -53,12 +53,15 @@ worktrees, then have a different provider review the combined diff before I merg
 $t3-orca 逐项开发 <需求>
 ```
 
-### Tier Profile 窗口
+### Tier Profile 窗口与作用域规则
 
-配置按项目保存：每个项目一份 `.t3-orca/tiers.yaml`，不读也不写全局配置。首次执行时打开交互式
-Tier Profile 窗口；保存后，后续执行直接复用项目配置，不再询问。也可以随时通过 `$t3-orca 配置`、`$t3-orca 设置`、`$t3-orca setup`（或当宿主将其路由到本 skill 时的 `/t3-orca 配置` / `/t3-orca 设置` / `/t3-orca setup`）以及 `打开 tier 窗口` 直接打开配置页；已存在的项目配置会被预载：
+配置按项目保存：每个项目一份 `.t3-orca/tiers.yaml`，不读也不写全局配置。作用域分为三层：
 
-[assets/tier-profile.html](assets/tier-profile.html)
+1. **对话开始读入项目默认值**：同项目新对话开始时，先查找并读取最近的 `.t3-orca/tiers.yaml`，作为该对话的默认 tier 配置。
+2. **表达 `setup` 意图才修改 `tiers.yaml`**：首次运行且项目没有 `.t3-orca/tiers.yaml`，或在对话中明确表达 setup 意图（如 `$t3-orca 配置`、`$t3-orca 设置`、`$t3-orca setup`、`/t3-orca setup`、`打开 tier 窗口`、或明确要求修改/保存到 `tiers.yaml`）时，才创建或更新 `.t3-orca/tiers.yaml`。已存在的项目配置会在窗口中预载。
+3. **对话中临时指定模型与 tier，不动 `tiers.yaml`**：如果在对话中说用某个模型来做某个 tier 的功能（例如“code 用 cursor opus max”、“用 sol6.1 做 review”，或在非 setup 流程里临时贴一段 `tiers:`），**不会修改 `.t3-orca/tiers.yaml`**，只在内存中覆盖当前对话的默认配置，并仅作用于**当前对话及其子对话（sub-agent / 子任务）**，不影响同项目中的其他会话。
+
+配置窗口模板：[assets/tier-profile.html](assets/tier-profile.html)
 
 窗口由模板生成。T3 Code 里优先用 `preview_open` 打开桥接页面，用户点一次 **保存到项目** 就能直接写入 `.t3-orca/tiers.yaml`；`html_preview` / `html_render` 作为复制/下载回退路径。生成时会自动注入 `orchestrator_capabilities` 的 live 目录，所以 provider / model 下拉直接来自当前 T3 Code 环境，不需要手动粘贴。功能：
 
@@ -79,14 +82,15 @@ Tier Profile 窗口；保存后，后续执行直接复用项目配置，不再�
 Capabilities 面板手动导入。`orchestrator_capabilities` 或 Node 不可用时，直接打开原始模板 `assets/tier-profile.html`；预览工具不可用时，给出文件绝对路径用浏览器打开。
 说 `刷新 tier 窗口` 时会重新调用 `orchestrator_capabilities` 并重建窗口。
 
-保存方式：
+手机如果只显示“像截图”的预览、无法点击，直接使用聊天回退：agent 展示项目现有的简写 `tiers:`，用户回复完整 YAML 或只改几行，agent 校验实时模型目录后保存并读回项目配置。调整到390像素仅解决布局，不代表手机能操作；不会反复开窗，也不会把电脑的 localhost 链接当作手机入口。仅在 setup 期间回传的 YAML 才作为保存项目配置的确认，即使一并贴了“逐项开发”命令也会保存；没有具体任务时不会启动子代理。
+
+保存方式（仅限 setup / 首次配置）：
 
 - 首选：在 `preview_open` 页面点 **保存到项目**，桥接直接写入项目配置；
-- 回退：复制生成的 YAML 粘贴回聊天，或下载 `tiers.yaml`，由 agent 用 `save-tier-profile.mjs` 落盘。
+- 回退：在 setup 流程中复制生成的 YAML 粘贴回聊天，或下载 `tiers.yaml`，由 agent 用 `save-tier-profile.mjs` 落盘。
 
-桥接保存后 Skill 直接读取并校验；如果收到 YAML 或下载文件，则通过
-`node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` 写入 `.t3-orca/tiers.yaml`，并只复述一次最终 profile。也支持直接说
-“code 用 cursor opus max”，或直接在消息开头贴简写：
+仅在 setup / 首次配置时，桥接保存后 Skill 直接读取并校验，或收到 setup YAML / 下载文件后通过
+`node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` 写入 `.t3-orca/tiers.yaml`，并只复述一次最终 profile。日常对话中未表达 setup 意图时，直接说“code 用 cursor opus max”或在消息里贴简写 `tiers:`：
 
 ```yaml
 tiers:
@@ -96,7 +100,9 @@ tiers:
   review: parent
 ```
 
-- 没有全局配置；执行时只查项目配置。没贴 profile 且项目没有 `.t3-orca/tiers.yaml` 时才打开窗口；保存后不再追问，也不会每个 item 追问。
+只会在内存中覆盖当前对话及子对话，**不会修改 `.t3-orca/tiers.yaml`**，也不会影响同项目的其他会话。
+
+- 没有全局配置；对话开始时读取项目 `.t3-orca/tiers.yaml` 作为默认值。没覆盖到所需 tier 且项目没有 `.t3-orca/tiers.yaml` 时才打开配置窗口；保存后不再追问，也不会每个 item 追问。
 - 格式支持 `sol6.1 @ high`、`provider:model @ key=value`、`fast: code @ low` 复用、`inherit`、`default` 和展开写法。
 - 模板在 [assets/tier-profile.template.yaml](assets/tier-profile.template.yaml)。
 

@@ -1,6 +1,6 @@
 ---
 name: t3-orca
-description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing, plus project-scoped Tier Profile setup (`配置`, `设置`, `setup`). Configuration lives only in the project's `.t3-orca/tiers.yaml`; a run with no project profile opens the configurator once and saves the result, with one-click direct save through a short-lived loopback bridge when T3 preview_open is available and copy/download as the fallback. Later runs reuse the file. Includes a tiered-delivery preset for 逐项开发: UI/design routes to sol6.1, pure code to magpie DeepSeek-Flash (Claude), the parent reviews, fixes go back to the original thread, up to 5 rounds, per-item commit, no push. Also includes a review-loop preset: an independent read-only reviewer (the profile's `review` tier, default sol6.1 low) checks each round, the parent fixes and verifies, max 5 rounds, ignore false positives and style, report blockers. Use for parallel or cross-provider delegation, worktree-isolated child tasks, or opening the Tier Profile configurator. Do not use when one agent can finish ordinary work without delegation."
+description: "Orchestrate T3 Code sub-agents on Orchestrator V2 with capability-matched provider/model routing, plus project-scoped Tier Profile setup (`配置`, `设置`, `setup`). At conversation start in a project, `.t3-orca/tiers.yaml` is read as the conversation's default profile. Expressing `setup` intent can create or modify `.t3-orca/tiers.yaml` (via the configurator's loopback bridge one-click save when `preview_open` is available, copy/download fallback, or explicit setup confirmation). In-conversation tier/model assignments (saying which model to use for a tier without `setup` intent) NEVER modify `.t3-orca/tiers.yaml` and apply only to the current conversation and its sub-conversations, leaving other sessions in the same project unaffected. Includes `tiered-delivery` (`逐项开发`) and `review-loop` (`review 循环`) presets. Use for parallel or cross-provider delegation, worktree-isolated child tasks, or Tier Profile setup. Do not use when one agent can finish ordinary work without delegation."
 metadata:
   short-description: Tiered delivery, read-only review loops, and Tier Profile setup
 ---
@@ -11,14 +11,18 @@ ORCA = Orchestrator Routing & Capability Assignment. Use T3 Code's Orchestrator 
 
 Short invocation: `$t3-orca 逐项开发 <request>` applies the tiered-delivery preset below. `$t3-orca review 循环 <scope>` applies the review-loop preset. `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup` (or `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup` when delivered to this skill) open the Tier Profile configurator directly.
 
-## Configuration-only command routing
+## Configuration and setup intent routing
 
-When the user asks only to configure or open the Tier Profile page — including `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, or `刷新 tier 窗口`:
+Distinguish **project setup intent** (may modify `.t3-orca/tiers.yaml`) from **in-conversation tier assignment** (never modifies `.t3-orca/tiers.yaml`):
 
-- **Configuration intent takes precedence over presets.** Do not start `tiered-delivery`, `review-loop`, or any delegation, and do not require an existing config or task selection merely to open the page.
-- **Existing config must not suppress explicit setup.** Even when inline `tiers:` or a project `.t3-orca/tiers.yaml` already exists, still build and open the window. If the project config exists, pass it to the builder with `--profile` so the page preloads it.
-- **Follow the Tier Profile window steps below** (`orchestrator_capabilities` -> absolute `node <skill-dir>/scripts/build-tier-profile.mjs [--profile <config>]` -> `tier-profile-bridge.mjs` -> `preview_open`; fallback `html_preview` -> `html_render` with `height` capped at `2000`), keeping the target project's working tree untouched.
-- **The page itself never writes files directly.** Prefer the bridge-served page via `preview_open` so the **保存到项目** button writes through the local bridge. If the bridge is unavailable, the inline iframe only generates YAML; ask the user to copy or download it, then write it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <project-root>`. Do not claim the inline iframe saves the file.
+- **Setup intent** — when the user asks to configure, setup, or modify the project's `tiers.yaml` — including `/t3-orca 配置`, `/t3-orca 设置`, `/t3-orca setup`, `$t3-orca 配置`, `$t3-orca 设置`, `$t3-orca setup`, `打开 tier 窗口`, `刷新 tier 窗口`, or mid-conversation requests such as "setup tier", "修改项目默认 tiers.yaml", or "把这个配置保存到 tiers.yaml":
+  - **Window/configurator commands** take precedence over presets: do not start `tiered-delivery`, `review-loop`, or any delegation, and do not require an existing config or task selection merely to open the page.
+  - **Existing config must not suppress explicit setup.** Even when a project `.t3-orca/tiers.yaml` already exists, still build and open the window (passing `--profile <config>` to preload it) or, when the user explicitly requests updating `.t3-orca/tiers.yaml` directly in chat, validate and save via `save-tier-profile.mjs`.
+  - **Follow the Tier Profile window steps below** (`orchestrator_capabilities` -> absolute `node <skill-dir>/scripts/build-tier-profile.mjs [--profile <config>]` -> `tier-profile-bridge.mjs` -> `preview_open`; fallback `html_preview` -> `html_render` with `height` capped at `2000`), keeping the target project's working tree untouched until the user saves.
+  - **The page itself never writes files directly.** Prefer the bridge-served page via `preview_open` so the **保存到项目** button writes through the local bridge. If the bridge is unavailable, the inline iframe only generates YAML; ask the user to copy or download it, then write it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <project-root>`. Do not claim the inline iframe saves the file.
+- **In-conversation tier assignment (no setup intent)** — when the user says in conversation which model/options to use for a tier (for example, "code 用 opus max", "用 sol6.1 做 review", or pastes an inline `tiers:` block without expressing `setup` intent):
+  - **Do NOT modify `.t3-orca/tiers.yaml`** and do not open the setup window to persist it.
+  - Overlay the assignment in memory onto the conversation's defaults (loaded from `.t3-orca/tiers.yaml`) for **this conversation and its sub-conversations/child tasks only**, so other sessions in the same project are unaffected.
 
 ## When to use
 
@@ -70,13 +74,13 @@ Short form:
 
 ### Tier profile window
 
-The short form above is the default profile used to prefill the setup page. Configuration is project-scoped only: there is no global profile. Before delegating, resolve the project root (the git root of the working directory, or the working directory outside a repo) and check `<project>/.t3-orca/tiers.yaml`:
+The short form above is the default profile used to prefill the setup page. Configuration is project-scoped only: there is no global profile. At conversation start (or before delegating in a thread), resolve the project root (the git root of the working directory, or the working directory outside a repo) and check `<project>/.t3-orca/tiers.yaml`:
 
-1. an inline `tiers:` block in the current message wins for this run;
-2. otherwise use the nearest `<project>/.t3-orca/tiers.yaml` found from the working directory up to the project root;
-3. otherwise open the Tier Profile window once, let the user choose, and save the result to `<project>/.t3-orca/tiers.yaml` before delegating.
+1. **Read project defaults at conversation start:** Look for the nearest `<project>/.t3-orca/tiers.yaml` from the working directory up to the project root. When it exists, load it as this conversation's default tier profile (missing tiers fall back to the preset default table).
+2. **Apply conversation-scoped overrides without touching `tiers.yaml`:** If the user pastes an inline `tiers:` block or states in conversation which model/options to use for a tier (without expressing `setup` intent), overlay those changes in memory onto the conversation's loaded defaults. This override applies **only to the current conversation and its sub-conversations/child tasks**; never modify `.t3-orca/tiers.yaml` and never affect other sessions in the same project.
+3. **Modify `tiers.yaml` only on `setup` intent or missing-profile setup:** If no `.t3-orca/tiers.yaml` exists and no session override covers the needed tiers (or the user explicitly expresses `setup` intent at any point), open the Tier Profile window once (or save the confirmed setup profile) to `<project>/.t3-orca/tiers.yaml`.
 
-Do not read or write `~/.config/t3-orca/tiers.yaml`, and do not silently run on the default table when the project has no profile.
+Do not read or write `~/.config/t3-orca/tiers.yaml`, and do not silently run on the default table when the project has no profile and no explicit session override was given.
 
 The window is built from [assets/tier-profile.html](assets/tier-profile.html) by [scripts/build-tier-profile.mjs](scripts/build-tier-profile.mjs). It is a self-contained configurator: provider and model pickers, effort options, aliases, parent/inherit/reuse modes, live-catalog validation, saved presets, and a generated `tiers:` block. [scripts/tier-profile-bridge.mjs](scripts/tier-profile-bridge.mjs) adds a short-lived loopback save bridge so the page can write the project config with one click.
 
@@ -124,13 +128,17 @@ test -f "$config" && echo "exists: $config" || echo "missing: $config"
 
    If the user explicitly uses desktop, use `mode: "fill"` instead. Verify the resize result's `viewport.width` is at most 560 for phone setup (use `preview_status` if omitted). If resizing fails, report it and offer the copy/download or chat fallback; do not claim mobile adaptation succeeded. Keep the setup tab open for the user. CSS media queries and `<meta name="viewport">` alone cannot fix a desktop-sized streamed viewport.
 
+   **Phone interaction failure:** A successful resize proves layout size only, not that the user's client can operate the streamed browser. If the user reports “像截图”, “点不了”, or “不能操作”, use the [chat fallback](references/tier-profile.md#chat-fallback) immediately: show the current project's compact `tiers:` block and accept either the full YAML or changed lines. If there is no project profile, show the preset defaults as editable suggestions. Check `preview_status` only to report observed state; `owner: agent` does not prove why touch input fails. Offer a control handoff only when an available tool explicitly supports it. Do not invent a handoff API or claim control was transferred. Do not repeatedly resize, reopen, or switch to `html_render` as a presumed interaction fix. An inline form may be tried once if the user requests it, but chat remains available without operating any page.
+
+   Do not send a phone a `localhost`, `127.0.0.1`, or local filesystem URL as a working remote-browser link. Do not expose the save bridge on a public or LAN interface to work around this. The existing loopback bridge remains local.
+
 6. Say one line: edit the tiers, then click **保存到项目**. The page writes the YAML through the bridge and shows `已保存到 <path>`. Ask the user to reply when it is saved. If the user asks to refresh the catalog, stop the bridge, call `orchestrator_capabilities` again, rebuild, and restart the bridge.
 7. When the user confirms, read `<config-base>/.t3-orca/tiers.yaml`, validate every target against `orchestrator_capabilities`, stop the bridge (`kill <pid>`), restate the profile once in compact form, and use it for the project. Do not ask again per item.
 8. Fallback if the bridge cannot start, `preview_open` is unavailable, or the page shows `本地桥接不可用`: call `html_preview` with the file `page` path and `width: 390` for phone/unknown clients (`1180` only for explicit desktop use), then `html_render` with the same `path`, `title: "Tier Profile"`, and `Math.min(contentHeight, 2000)` as `height`. Ask the user to copy the YAML back or download it, then save it with `node <skill-dir>/scripts/save-tier-profile.mjs --project <config-base>` (YAML on stdin). If they downloaded `tiers.yaml`, move or copy it to `<config-base>/.t3-orca/tiers.yaml` after confirming the path.
 
-If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, or the frame is not interactive, give the user the absolute file path to open in a browser.
+If `orchestrator_capabilities` or Node is unavailable, open the raw `<skill-dir>/assets/tier-profile.html` and use its manual `Capabilities` panel. If `html_preview` or `html_render` is unavailable, give desktop users the absolute file path to open locally. For a non-interactive frame or a phone without access to that filesystem, use the chat fallback.
 
-Chat fallback when no window is available:
+Chat fallback when no usable window is available (including a phone showing only a non-interactive preview):
 
 ```yaml
 tiers:
@@ -142,6 +150,8 @@ tiers:
 
 Say only changed lines are required; tiers can be added or removed. Then validate against capabilities, save it to `<project>/.t3-orca/tiers.yaml` with `scripts/save-tier-profile.mjs`, and use it. See [references/tier-profile.md](references/tier-profile.md).
 
+**Setup reply routing:** ONLY while an explicit setup prompt or configurator session is pending, YAML or natural-language tier edits are the user's confirmation to save the project profile (even if the pasted block also contains `$t3-orca 逐项开发`). Validate targets against live capabilities, overlay partial edits on the preloaded project profile, save via `save-tier-profile.mjs`, and read the file back. Stop the setup bridge after saving or abandoning the page; if its PTY/session already exited, confirm that the recorded process is gone and continue without turning cleanup into a save failure. Restate the accepted profile once. If no development task accompanies the configuration, ask for the task and do not start delegates or repeat previously completed work. Outside a pending setup flow (or explicit `setup` intent), tier/model assignments stay scoped to the current conversation and its sub-conversations and never write `.t3-orca/tiers.yaml`.
+
 The `review-loop` preset reuses this profile's `review` tier; it does not maintain a separate reviewer setting.
 
 ## Preset: independent review loop
@@ -150,7 +160,7 @@ When the user says `review 循环`, `review-loop`, `只读 Review 循环`, says 
 
 Short form:
 
-- The reviewer is the **`review` tier from the same project profile the development flow uses**, started fresh every round. Resolve it exactly like `逐项开发`: inline `tiers:` → nearest `<project>/.t3-orca/tiers.yaml` → project setup opened once with the preset default prefilled. An explicit target in the current message wins over the profile. Never use a global config, never the parent alone, and never `t3_thread_send` to an earlier reviewer.
+- The reviewer is the **`review` tier from the same conversation tier profile** (loaded from nearest `<project>/.t3-orca/tiers.yaml` at conversation start, with any in-conversation `review` override applied for this conversation and its children without modifying `tiers.yaml`; if no project file exists and no explicit target is given, open project setup once with the preset default prefilled). An explicit target in the current conversation wins over `.t3-orca/tiers.yaml` without writing to disk. Never use a global config, never the parent alone, and never `t3_thread_send` to an earlier reviewer.
 - The review-loop default for the `review` tier is `sol6.1 @ low` (provider `codex`, model `gpt-6.1-sol`, `reasoningEffort: low`). `review: parent` is a tiered-delivery value; here it means unset, so use this default. Do not maintain a separate reviewer setting.
 - The **parent fixes and verifies**. Fix only substantive findings yourself, run tests, then start the next round.
 - **Ignore false positives and style-only suggestions.** Record them; do not change code for them and never spend a round on them.
@@ -171,7 +181,7 @@ Short form:
 8. **No secrets in `task`.** Use `request_secret`. Never put tokens, passwords, or private keys in a child brief.
 9. **A delegated child does not re-delegate.** If you are the child, do the work yourself. Start no subagents unless your brief explicitly authorizes it.
 10. **Apply a preset only when it fits.** Use `tiered-delivery` when the user invokes it by name or gives a multi-item implementation request that also asks for autonomous review/commit handling. Use `review-loop` when the user asks for a delegated review-and-fix loop. Do not apply either preset's review, fix, round-limit, or commit rules to ordinary one-off delegation.
-11. **Resolve the tier profile once per thread.** Check the inline `tiers:` block, then the nearest `<project>/.t3-orca/tiers.yaml`. There is no global profile. If neither exists, open the Tier Profile window once (or use the chat fallback), let the user choose, and save the result to the project before delegating. For `review-loop`, the same rule applies; the page is prefilled with `sol6.1 @ low` unless the user explicitly says to use the preset default for this run. Do not ask for tier settings per item, and do not assume another project's profile applies.
+11. **Project defaults at start; session-scoped overrides in conversation; write `tiers.yaml` only on setup.** At conversation start in a project, read the nearest `<project>/.t3-orca/tiers.yaml` as the conversation's default profile. There is no global profile. Any in-conversation tier/model assignment (or inline `tiers:`) without `setup` intent overlays in memory **for the current conversation and its sub-conversations/child tasks only** — never modify `.t3-orca/tiers.yaml` and never affect other sessions in the same project. Pass resolved targets (and effective `tiers:` in the brief when a child is authorized to sub-delegate) down to children so sub-conversations inherit the conversation's overrides without touching disk. Only modify `.t3-orca/tiers.yaml` when the user expresses `setup` intent or completes first-time project setup (when neither `.t3-orca/tiers.yaml` nor a covering session override exists; for `review-loop`, prefill `sol6.1 @ low` unless the user says to use the preset default for this run). Do not ask for tier settings per item, and do not assume another project's profile applies.
 12. **The review-loop reviewer stays read-only.** The reviewer never edits, stages, commits, or pushes; the parent owns fixes and verification. Never send fixes to the reviewer, never let style or false positives extend the loop, and never exceed 5 rounds without explicit authorization.
 
 ## Core workflow
@@ -274,6 +284,7 @@ In the `tiered-delivery` preset, the `review` row is the parent thread by defaul
 | Child asks a question or needs approval | Surface it, or answer in the child thread if authorized. Do not guess. |
 | No project `.t3-orca/tiers.yaml` | Open the Tier Profile window once and save the result. Do not run on an unsaved default or a global config. |
 | Bridge page shows `本地桥接不可用` in `html_render` | T3's HTML renderer uses a SOCKS proxy that blocks loopback. Open the same bridge page with `preview_open` (`environment-port`), or fall back to copy/download. |
+| Phone preview looks like a screenshot or cannot be operated | Use chat fallback with the existing profile; validate and save the returned YAML. Resizing does not establish touch support; do not infer the cause from ownership alone. |
 | Bridge process exited or `preview_open` unavailable | Restart the bridge once; if it still fails, use the copy/download fallback. Do not leave the user with an unsaved profile. |
 | Substantive findings remain after round 5 | Mark the item or work blocked; do not commit. In `review-loop`, report the blocking reasons and recommended next options. Continue only with explicit authorization. |
 | Review reports only style, nits, or false positives | Treat the round as clean after triage; record the dismissed items; do not fix them to please the reviewer. |
@@ -307,7 +318,10 @@ In the `tiered-delivery` preset, the `review` row is the parent thread by defaul
 - Pasting a long provider/model/effort template instead of opening the Tier Profile window.
 - Asking for tier settings per item instead of once per thread.
 - Reading or writing a global `~/.config/t3-orca/tiers.yaml`.
-- Silently using the default table when the project has no `.t3-orca/tiers.yaml`.
+- Modifying `.t3-orca/tiers.yaml` when the user assigns a model to a tier in conversation without expressing `setup` intent.
+- Letting an in-conversation tier assignment affect other sessions in the same project, or omitting it from the current conversation's sub-conversations/children.
+- Discarding `.t3-orca/tiers.yaml` defaults for unmentioned tiers when applying an in-conversation override.
+- Silently using the default table when the project has no `.t3-orca/tiers.yaml` and no session override was given.
 - Assuming another project's tier profile applies without checking.
 - Claiming the iframe writes `.t3-orca/tiers.yaml`; it only generates YAML.
 - Using `html_render` for the bridge page when `preview_open` is available; the inline renderer's SOCKS proxy blocks loopback.

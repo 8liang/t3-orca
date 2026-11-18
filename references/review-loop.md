@@ -44,9 +44,9 @@ The review-loop default for the `review` tier is `sol6.1 @ low` (provider `codex
 
 Resolve in this order:
 
-1. an explicit target in the current message (`派 claude opus 只读 review`, `review 用 sol6.1 high`);
-2. the `review` tier from the project profile: inline `tiers:`, then `<project>/.t3-orca/tiers.yaml`;
-3. no project profile: open the Tier Profile window once, prefilled with the preset default `sol6.1 @ low`, and save the result to the project before starting.
+1. an explicit target or `review` tier assignment in the current conversation (`派 claude opus 只读 review`, `review 用 sol6.1 high`, or inline `tiers:`): applies **only to this conversation and its review sub-agents** without modifying `.t3-orca/tiers.yaml`;
+2. the `review` tier loaded at conversation start from the nearest `<project>/.t3-orca/tiers.yaml`;
+3. no project profile and no explicit session target: open the Tier Profile window once, prefilled with the preset default `sol6.1 @ low`, and save the result to the project before starting.
 
 To get the reviewer from the example request, configure it in the same way as the development flow:
 
@@ -57,7 +57,7 @@ tiers:
 
 `review: parent` is a `tiered-delivery` value. Here it means the profile did not name a reviewer, so use the preset default. This preset always needs an independent reviewer.
 
-There is no global profile. If the project has no profile and the current message has no explicit target, open the Tier Profile window once so the project gets one; do not run on an unsaved default. If the user explicitly says to use the preset default for this run, use `sol6.1 @ low` without saving. If the user asks to configure tiers, resolve and validate it exactly as the development flow does, including the live-capabilities injection in the Tier Profile window.
+There is no global profile. If the project has no profile and the current conversation has no explicit target, open the Tier Profile window once so the project gets one; do not run on an unsaved default. If the user explicitly says to use the preset default for this run, use `sol6.1 @ low` without saving. If the user expresses `setup` intent to configure tiers, resolve, validate, and save to `.t3-orca/tiers.yaml` exactly as the development flow does, including live-capabilities injection in the Tier Profile window.
 
 `ui`, `code`, and `fast` do not affect the reviewer. Use the effort configured on the `review` tier; do not override a concrete profile target with the preset default.
 
