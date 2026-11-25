@@ -15,6 +15,14 @@ ORCA = **Orchestrator Routing & Capability Assignment**。
 
 ## 安装
 
+一条命令安装到当前 agent（`npx skills`，见 [skills.sh](https://skills.sh)）：
+
+```bash
+npx skills add 8liang/t3-orca -g -y
+```
+
+离线或手动安装：
+
 ```bash
 # Codex
 ln -s "$(pwd)" "${CODEX_HOME:-$HOME/.codex}/skills/t3-orca"
